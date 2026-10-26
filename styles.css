@@ -612,9 +612,9 @@ body.light-theme .btn-primary {
 
 .coord-cols {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(8, 1fr);
     gap: 4px;
-    padding: 0 8px; /* 6px padding container + 2px border */
+    padding: 0 10px; /* 8px inset + 2px border = 10px */
     height: 24px;
     align-items: center;
     box-sizing: border-box;
@@ -632,10 +632,11 @@ body.light-theme .btn-primary {
 
 .coord-rows {
     display: grid;
-    grid-template-rows: repeat(8, minmax(0, 1fr));
+    grid-template-rows: repeat(8, 1fr);
     gap: 4px;
-    padding: 8px 0; /* 6px padding container + 2px border */
+    padding: 10px 0; /* 8px inset + 2px border = 10px */
     width: 24px;
+    height: 100%;
     align-items: center;
     justify-items: center;
     box-sizing: border-box;
@@ -659,7 +660,7 @@ body.light-theme .btn-primary {
     background: var(--grid-bg);
     border: 2px solid var(--neo-border);
     border-radius: 14px;
-    padding: 6px;
+    padding: 0;
     box-shadow: var(--neo-raised-shadow), inset 0 0 18px rgba(0, 0, 0, 0.4);
     position: relative;
     overflow: hidden;
@@ -681,13 +682,15 @@ body.light-theme .btn-primary {
 }
 
 .grid-board {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    grid-template-rows: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     gap: 4px;
-    width: 100%;
-    height: 100%;
-    position: relative;
     z-index: 2;
     box-sizing: border-box;
 }
@@ -710,6 +713,8 @@ body.light-theme .btn-primary {
     transition: all 0.15s ease;
     position: relative;
     box-sizing: border-box;
+    overflow: hidden;
+    line-height: 1;
 }
 
 .grid-cell:hover {
@@ -969,49 +974,6 @@ body.light-theme .grid-cell.occupied.plane-color-3.plane-tail {
     max-width: 380px;
 }
 
-@media (max-width: 480px) {
-    .radar-frame {
-        max-width: 350px;
-        grid-template-columns: 20px 1fr;
-        grid-template-rows: 20px 1fr;
-        gap: 3px;
-    }
-    .coord-corner {
-        width: 20px;
-        height: 20px;
-    }
-    .coord-cols {
-        height: 20px;
-        padding: 0 7px;
-        gap: 3px;
-    }
-    .coord-cols span,
-    .coord-rows span {
-        font-size: 11px;
-    }
-    .coord-rows {
-        width: 20px;
-        padding: 7px 0;
-        gap: 3px;
-    }
-    .grid-container {
-        padding: 5px;
-        border-radius: 12px;
-    }
-    .grid-board {
-        gap: 3px;
-    }
-    .grid-cell {
-        font-size: 14px;
-        border-radius: 4px;
-    }
-    .board-wrapper {
-        max-width: 350px;
-    }
-    .boards-dual-layout {
-        gap: 20px;
-    }
-}
 
 .board-label {
     font-family: var(--font-display);
@@ -1227,12 +1189,21 @@ body.light-theme .app-modal {
     }
 
     .radar-frame {
-        max-width: min(92vw, 370px);
-        gap: 2px;
+        max-width: min(92vw, 360px);
+        grid-template-columns: 20px 1fr;
+        grid-template-rows: 20px 1fr;
+        gap: 3px;
+    }
+
+    .coord-corner {
+        width: 20px;
+        height: 20px;
     }
 
     .coord-cols {
         height: 20px;
+        padding: 0 8px; /* 6px inset + 2px border = 8px */
+        gap: 3px;
     }
 
     .coord-cols span {
@@ -1241,29 +1212,40 @@ body.light-theme .app-modal {
 
     .coord-rows {
         width: 20px;
+        padding: 8px 0; /* 6px inset + 2px border = 8px */
+        height: 100%;
+        gap: 3px;
     }
 
     .coord-rows span {
         font-size: 11px;
     }
 
-    .coord-corner {
-        width: 20px;
-        height: 20px;
-    }
-
     .grid-container {
-        padding: 6px;
-        border-radius: 14px;
+        padding: 0;
+        border: 2px solid var(--neo-border);
+        border-radius: 12px;
     }
 
     .grid-board {
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        bottom: 6px;
         gap: 3px;
     }
 
     .grid-cell {
         border-radius: 4px;
-        font-size: 15px;
+        font-size: 14px;
+    }
+
+    .board-wrapper {
+        max-width: 360px;
+    }
+
+    .boards-dual-layout {
+        gap: 20px;
     }
 
     .turn-banner {

@@ -1,11 +1,11 @@
 // Service Worker pentru Jocul de Avioane 8x8 (PWA)
-const CACHE_NAME = 'avioane-v10';
+const CACHE_NAME = 'avioane-v11';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=10',
-  './game.js?v=10',
-  './sound.js?v=10',
+  './styles.css?v=11',
+  './game.js?v=11',
+  './sound.js?v=11',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
