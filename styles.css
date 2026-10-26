@@ -304,8 +304,8 @@ body::before {
 }
 
 .radio-group {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
     margin-bottom: 16px;
 }
@@ -313,15 +313,18 @@ body::before {
 /* Butoane Radio Tactile / Debossed la selecție */
 .radio-card {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 10px;
     background: var(--neo-button-bg);
-    padding: 12px 16px;
+    padding: 12px 10px;
     border-radius: 14px;
     border: 1px solid var(--neo-border);
     box-shadow: var(--neo-raised-shadow-sm);
     cursor: pointer;
     transition: all 0.2s ease;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 100%;
 }
 
 .radio-card:hover {
@@ -329,14 +332,49 @@ body::before {
 }
 
 .radio-card:has(input:checked) {
-    box-shadow: var(--neo-inset-shadow);
+    box-shadow: var(--neo-inset-shadow), 0 0 10px rgba(0, 245, 212, 0.2);
     border-color: var(--neon-cyan);
+    background: rgba(0, 245, 212, 0.06);
+}
+
+body.light-theme .radio-card:has(input:checked) {
+    box-shadow: inset 2px 2px 5px #cbd5e1, 0 0 8px rgba(0, 119, 182, 0.25);
+    border-color: #0077b6;
+    background: rgba(0, 119, 182, 0.08);
 }
 
 .radio-card input {
     accent-color: var(--neon-cyan);
     width: 18px;
     height: 18px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.radio-card-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.radio-card-title {
+    color: var(--neon-cyan);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+body.light-theme .radio-card-title {
+    color: #0077b6;
+}
+
+.radio-card-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.35;
+    word-break: break-word;
 }
 
 .form-select, .form-input {
