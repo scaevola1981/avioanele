@@ -17,7 +17,7 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- Design & Fonturi (cu cache-busting v=15) -->
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
 
@@ -266,6 +266,39 @@
                             <div id="attack-grid" class="grid-board"></div>
                         </div>
                     </div>
+
+                    <!-- Instrument Deducere & Marcaj Manual Avioane Doborâte -->
+                    <div class="deduction-controls-wrapper">
+                        <div class="deduction-toggle-row">
+                            <button id="btn-toggle-deduction-mode" class="btn-deduction-toggle" type="button">
+                                ✏️ DEDUCE / MARCHEAZĂ AVION
+                            </button>
+                            <button id="btn-clear-deductions" class="btn-deduction-clear hidden" type="button">
+                                🗑️ Șterge Marcaje
+                            </button>
+                        </div>
+
+                        <!-- Panou interactiv de orientare & așezare -->
+                        <div id="combat-deduction-panel" class="combat-deduction-panel hidden">
+                            <div id="deduction-instruction-hint" class="deduction-hint">
+                                👆 1. Atinge <b>Capul</b> pe radar &nbsp;|&nbsp; 2. Alege direcția:
+                            </div>
+                            <div id="deduction-orientations-bar" class="deduction-orientations-bar">
+                                <button class="deduction-dir-btn" data-orient="N" type="button">⬆️ N</button>
+                                <button class="deduction-dir-btn" data-orient="S" type="button">⬇️ S</button>
+                                <button class="deduction-dir-btn" data-orient="W" type="button">⬅️ V</button>
+                                <button class="deduction-dir-btn" data-orient="E" type="button">➡️ E</button>
+                            </div>
+                            <div class="deduction-actions-bar">
+                                <button id="btn-confirm-deduction" class="btn-primary" style="padding: 6px 16px; font-size: 13px;" type="button" disabled>
+                                    ✅ AȘEAZĂ
+                                </button>
+                                <button id="btn-cancel-deduction" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;" type="button">
+                                    ÎNCHIDE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -427,16 +460,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=15) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=16) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=15"></script>
-    <script src="game.js?v=15"></script>
+    <script src="sound.js?v=16"></script>
+    <script src="game.js?v=16"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=15')
+                navigator.serviceWorker.register('./sw.js?v=16')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });

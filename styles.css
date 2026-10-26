@@ -1009,6 +1009,175 @@ body.light-theme .defense-cell.shot-head {
 }
 
 /* ========================================================
+   7.1 DEDUCERE ȘI MARCAJ MANUAL AVIOANE PE RADAR ATAC
+   ======================================================== */
+.deduced-plane-cell {
+    background: rgba(0, 245, 212, 0.12) !important;
+    border: 1.5px dashed rgba(0, 245, 212, 0.6) !important;
+}
+
+.deduced-plane-cell.deduced-head {
+    background: rgba(255, 183, 3, 0.25) !important;
+    border: 2px dashed var(--neon-gold) !important;
+}
+
+.deduced-plane-cell.deduced-wing {
+    border-style: dotted !important;
+}
+
+.deduction-preview-cell {
+    background: rgba(0, 245, 212, 0.28) !important;
+    border: 2px dashed var(--neon-cyan) !important;
+}
+
+.deduction-preview-cell.preview-head,
+.deduction-active-head {
+    background: radial-gradient(circle, #ffb703 30%, #fb8500 100%) !important;
+    border: 2px solid #ffffff !important;
+    color: #031122 !important;
+    font-weight: 800;
+}
+
+.attack-cell.deduction-clickable {
+    cursor: crosshair;
+}
+
+.attack-cell.deduction-clickable:hover {
+    outline: 2px dashed var(--neon-cyan);
+    outline-offset: -2px;
+}
+
+body.light-theme .deduced-plane-cell {
+    background: rgba(0, 119, 182, 0.12) !important;
+    border: 1.5px dashed rgba(0, 119, 182, 0.6) !important;
+}
+
+body.light-theme .deduced-plane-cell.deduced-head {
+    background: rgba(255, 183, 3, 0.25) !important;
+    border: 2px dashed #d00000 !important;
+}
+
+.deduction-controls-wrapper {
+    margin-top: 12px;
+    width: 100%;
+    max-width: var(--board-max-size);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+}
+
+.deduction-toggle-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-deduction-toggle {
+    background: var(--btn-secondary-bg);
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: var(--font-military);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--neo-box-shadow);
+}
+
+.btn-deduction-toggle:hover {
+    background: rgba(0, 245, 212, 0.15);
+}
+
+.btn-deduction-toggle.active-mode {
+    background: var(--neon-gold) !important;
+    color: #031122 !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(255, 183, 3, 0.8) !important;
+    animation: goldPulse 1.5s infinite alternate;
+}
+
+.btn-deduction-clear {
+    background: rgba(255, 0, 84, 0.15);
+    color: var(--neon-crimson);
+    border: 1px solid var(--neon-crimson);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: var(--font-military);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-deduction-clear:hover {
+    background: rgba(255, 0, 84, 0.25);
+}
+
+.combat-deduction-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--neo-box-shadow);
+    border-radius: 10px;
+    padding: 10px 14px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    animation: fadeIn 0.25s ease-out;
+    box-sizing: border-box;
+}
+
+.deduction-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.deduction-orientations-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.deduction-dir-btn {
+    background: var(--btn-secondary-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.deduction-dir-btn.active {
+    background: var(--neon-cyan) !important;
+    color: #031122 !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 8px var(--neon-cyan);
+}
+
+.deduction-dir-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.deduction-actions-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+/* ========================================================
    8. FAZA DE LUPTĂ (COMBAT HUD)
    ======================================================== */
 .combat-hud {

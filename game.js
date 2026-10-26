@@ -59,6 +59,12 @@ const state = {
     myShotsOnEnemy: {},  // cellIndex -> { status: 'MISS' | 'HIT' | 'HEAD', planeId }
     enemyShotsOnMe: {},  // cellIndex -> { status: 'MISS' | 'HIT' | 'HEAD', planeId }
     lastCombatMessage: '', // Mesaj de feedback cu coordonate (ex: "Ai tras la C4: LOVIT!")
+
+    // Deducere & Marcaj manual al avioanelor inamice pe Radar Atac (regula clasică)
+    myDeductionsOnEnemy: [], // [{ head: {r, c}, orient: 'N', cells: [...] }]
+    isDeductionMode: false,
+    deductionPreviewHead: null,
+    deductionPreviewOrient: 'S',
     
     // Statistici meci
     stats: {
@@ -177,6 +183,7 @@ function saveMatchSession() {
         currentTurn: state.currentTurn,
         myShotsOnEnemy: state.myShotsOnEnemy,
         enemyShotsOnMe: state.enemyShotsOnMe,
+        myDeductionsOnEnemy: state.myDeductionsOnEnemy || [],
         lastCombatMessage: state.lastCombatMessage,
         stats: state.stats,
         timestamp: Date.now()
@@ -221,6 +228,7 @@ function resumeMatch(session) {
     state.currentTurn = session.currentTurn || 'host';
     state.myShotsOnEnemy = session.myShotsOnEnemy || {};
     state.enemyShotsOnMe = session.enemyShotsOnMe || {};
+    state.myDeductionsOnEnemy = session.myDeductionsOnEnemy || [];
     state.lastCombatMessage = session.lastCombatMessage || '';
     state.stats = session.stats || state.stats;
     state.phase = session.phase;
@@ -781,11 +789,10 @@ function handleIncomingShot(cellIndex) {
     const statusLabel = resultStatus === 'HEAD' ? 'CAP DOBORÂT! 💥' : (resultStatus === 'HIT' ? 'LOVIT! 🔥' : 'RATAT ÎN APĂ 🌊');
     state.lastCombatMessage = `🛡️ Inamicul a tras la <b>${coord}</b>: <span style="color: ${resultStatus === 'HEAD' ? 'var(--neon-gold)' : (resultStatus === 'HIT' ? 'var(--neon-crimson)' : '#48cae4')}">${statusLabel}</span>`;
 
-    // Trimite rezultatul înapoi trăgătorului
+    // Trimite rezultatul înapoi trăgătorului (fără a dezvălui coordonatele corpului avionului)
     broadcastEvent('SHOT_RESULT', {
         cellIndex,
         status: resultStatus,
-        planeDownCells,
         allDestroyed
     });
 
@@ -822,7 +829,7 @@ function handleIncomingShot(cellIndex) {
  * Primește confirmarea focului tras de mine pe tabla inamicului
  */
 function handleShotResultReceived(payload) {
-    const { cellIndex, status, planeDownCells, allDestroyed } = payload;
+    const { cellIndex, status, allDestroyed } = payload;
     const coord = getCoordinateLabel(cellIndex);
 
     state.myShotsOnEnemy[cellIndex] = { status };
@@ -831,14 +838,15 @@ function handleShotResultReceived(payload) {
         soundFX.playPlaneDestroyed();
         state.stats.enemyDownedPlanes++;
         state.stats.myHits++;
-        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT! 💥</span>`;
-
-        // Marchează tot avionul doborât pe ecran
-        if (planeDownCells && planeDownCells.length > 0) {
-            planeDownCells.forEach(idx => {
-                state.myShotsOnEnemy[idx] = { status: 'PLANE_BODY_DOWN' };
-            });
-            state.myShotsOnEnemy[cellIndex] = { status: 'HEAD' };
+        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT! 💥</span> (Apasă „✏️ DEDUCE / MARCHEAZĂ” pentru a așeza avionul)`;
+        
+        // Regula clasică: NU dezvăluim corpul avionului automat! Doar capul este marcat.
+        state.myShotsOnEnemy[cellIndex] = { status: 'HEAD' };
+        
+        // Evidențiem butonul de deducere
+        const deductionBtn = document.getElementById('btn-toggle-deduction-mode');
+        if (deductionBtn) {
+            deductionBtn.classList.add('pulse-ready');
         }
     } else if (status === 'HIT') {
         soundFX.playHit();
@@ -1235,10 +1243,13 @@ function placePlane(headR, headC, orient) {
 
 function startCombatPhase() {
     state.phase = 'BATTLE';
+    state.isDeductionMode = false;
+    state.deductionPreviewHead = null;
     showScreen('combat-screen');
     renderAttackGrid();
     renderDefenseGrid();
     updateCombatStatusUI();
+    updateDeductionControlsUI();
     saveMatchSession();
 }
 
@@ -1249,15 +1260,67 @@ function renderAttackGrid() {
 
     const isMyTurn = state.currentTurn === state.role;
 
+    // 1. Cartografiază deducerile salvate pe radarul inamicului
+    const deducedMap = {};
+    if (state.myDeductionsOnEnemy && state.myDeductionsOnEnemy.length > 0) {
+        state.myDeductionsOnEnemy.forEach((deduction, dIdx) => {
+            if (deduction.cells) {
+                deduction.cells.forEach(c => {
+                    if (c.r >= 0 && c.r < GRID_SIZE && c.c >= 0 && c.c < GRID_SIZE) {
+                        const idx = c.r * GRID_SIZE + c.c;
+                        deducedMap[idx] = { type: c.type, dIndex: dIdx };
+                    }
+                });
+            }
+        });
+    }
+
+    // 2. Cartografiază previzualizarea conturului când modul deducere e activ
+    const previewMap = {};
+    if (state.isDeductionMode && state.deductionPreviewHead) {
+        const previewCells = calculatePlaneCells(
+            state.deductionPreviewHead.r,
+            state.deductionPreviewHead.c,
+            state.deductionPreviewOrient,
+            state.planeVariant
+        );
+        previewCells.forEach(c => {
+            if (c.r >= 0 && c.r < GRID_SIZE && c.c >= 0 && c.c < GRID_SIZE) {
+                const idx = c.r * GRID_SIZE + c.c;
+                previewMap[idx] = { type: c.type };
+            }
+        });
+    }
+
     for (let i = 0; i < TOTAL_CELLS; i++) {
+        const r = Math.floor(i / GRID_SIZE);
+        const c = i % GRID_SIZE;
         const cellEl = document.createElement('div');
         cellEl.className = 'grid-cell attack-cell';
-        if (isMyTurn) {
-            cellEl.classList.add('can-fire');
-        }
         cellEl.dataset.index = i;
+        cellEl.dataset.r = r;
+        cellEl.dataset.c = c;
         const coord = getCoordinateLabel(i);
 
+        // A. Deduceri salvate (blueprint tactic)
+        if (deducedMap[i]) {
+            cellEl.classList.add('deduced-plane-cell', `deduced-${deducedMap[i].type}`);
+        }
+
+        // B. Previzualizare contur activ
+        if (previewMap[i]) {
+            cellEl.classList.add('deduction-preview-cell');
+            if (previewMap[i].type === 'head') {
+                cellEl.classList.add('preview-head');
+            }
+        }
+
+        // C. Cap selectat activ în modul deducere
+        if (state.isDeductionMode && state.deductionPreviewHead && state.deductionPreviewHead.r === r && state.deductionPreviewHead.c === c) {
+            cellEl.classList.add('deduction-active-head');
+        }
+
+        // D. Lovituri efective
         const shot = state.myShotsOnEnemy[i];
         if (shot) {
             cellEl.classList.add('cell-shot', `shot-${shot.status.toLowerCase()}`);
@@ -1274,13 +1337,271 @@ function renderAttackGrid() {
                 cellEl.innerHTML = '⏳';
                 cellEl.title = `${coord}: Se transmite...`;
             }
+        }
+
+        // E. Interacțiune click
+        if (state.isDeductionMode) {
+            cellEl.classList.add('deduction-clickable');
+            cellEl.title = `Atinge pentru a fixa Capul dedus la ${coord}`;
+            cellEl.addEventListener('click', () => handleDeductionCellClick(r, c));
         } else {
-            cellEl.title = isMyTurn ? `Trage la coordonata ${coord}` : `Așteaptă rândul (coordonata ${coord})`;
-            cellEl.addEventListener('click', () => fireAtEnemy(i));
+            if (isMyTurn && !shot) {
+                cellEl.classList.add('can-fire');
+            }
+            if (!shot) {
+                cellEl.title = isMyTurn ? `Trage la coordonata ${coord}` : `Așteaptă rândul (coordonata ${coord})`;
+                cellEl.addEventListener('click', () => fireAtEnemy(i));
+            }
         }
 
         gridEl.appendChild(cellEl);
     }
+}
+
+// ==========================================
+// 4.1 INSTRUMENT DEDUCERE & MARCAJ AVIOANE PE RADAR ATAC
+// Regula clasică: la CAP DOBORÂT, atacatorul așază manual conturul
+// ==========================================
+
+function handleDeductionCellClick(r, c) {
+    soundFX.playClick();
+    state.deductionPreviewHead = { r, c };
+    
+    // Verifică dacă orientarea curentă este validă pe tablă, altfel alege prima orientare validă
+    const currentCells = calculatePlaneCells(r, c, state.deductionPreviewOrient, state.planeVariant);
+    if (!isWithinBounds(currentCells)) {
+        for (const testOrient of ['S', 'N', 'E', 'W']) {
+            const testCells = calculatePlaneCells(r, c, testOrient, state.planeVariant);
+            if (isWithinBounds(testCells)) {
+                state.deductionPreviewOrient = testOrient;
+                break;
+            }
+        }
+    }
+    
+    updateDeductionControlsUI();
+    renderAttackGrid();
+}
+
+function toggleDeductionMode() {
+    soundFX.playClick();
+    state.isDeductionMode = !state.isDeductionMode;
+
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const panel = document.getElementById('combat-deduction-panel');
+
+    if (state.isDeductionMode) {
+        if (toggleBtn) {
+            toggleBtn.classList.add('active-mode');
+            toggleBtn.classList.remove('pulse-ready');
+            toggleBtn.textContent = '❌ ÎNCHIDE MARCAJ';
+        }
+        if (panel) panel.classList.remove('hidden');
+
+        // Dacă nu avem încă un cap selectat, pre-selectăm cel mai recent cap doborât (HEAD)
+        if (!state.deductionPreviewHead) {
+            const headEntries = Object.entries(state.myShotsOnEnemy).filter(([idx, s]) => s.status === 'HEAD');
+            if (headEntries.length > 0) {
+                const lastHeadIdx = parseInt(headEntries[headEntries.length - 1][0]);
+                const hr = Math.floor(lastHeadIdx / GRID_SIZE);
+                const hc = lastHeadIdx % GRID_SIZE;
+                state.deductionPreviewHead = { r: hr, c: hc };
+                
+                for (const testOrient of ['S', 'N', 'E', 'W']) {
+                    const testCells = calculatePlaneCells(hr, hc, testOrient, state.planeVariant);
+                    if (isWithinBounds(testCells)) {
+                        state.deductionPreviewOrient = testOrient;
+                        break;
+                    }
+                }
+            }
+        }
+        updateDeductionControlsUI();
+    } else {
+        if (toggleBtn) {
+            toggleBtn.classList.remove('active-mode');
+            toggleBtn.textContent = '✏️ DEDUCE / MARCHEAZĂ AVION';
+        }
+        if (panel) panel.classList.add('hidden');
+    }
+
+    renderAttackGrid();
+}
+
+function confirmDeductionPlacement() {
+    if (!state.deductionPreviewHead) return;
+    const cells = calculatePlaneCells(
+        state.deductionPreviewHead.r,
+        state.deductionPreviewHead.c,
+        state.deductionPreviewOrient,
+        state.planeVariant
+    );
+
+    if (!isWithinBounds(cells)) {
+        alert("Avionul iese în afara radarului în această direcție!");
+        return;
+    }
+
+    soundFX.playRadarPing();
+
+    // Salvează deducerea pe radarul de atac
+    state.myDeductionsOnEnemy.push({
+        head: { ...state.deductionPreviewHead },
+        orient: state.deductionPreviewOrient,
+        cells: cells
+    });
+
+    const coord = getCoordinateLabel(state.deductionPreviewHead.r * GRID_SIZE + state.deductionPreviewHead.c);
+    state.lastCombatMessage = `✏️ Ai așezat pe radar conturul avionului la <b>${coord}</b> (${state.deductionPreviewOrient})!`;
+
+    // Resetăm modul de previzualizare
+    state.deductionPreviewHead = null;
+    state.isDeductionMode = false;
+
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const panel = document.getElementById('combat-deduction-panel');
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active-mode');
+        toggleBtn.textContent = '✏️ DEDUCE / MARCHEAZĂ AVION';
+    }
+    if (panel) panel.classList.add('hidden');
+
+    updateDeductionControlsUI();
+    renderAttackGrid();
+    updateCombatStatusUI();
+    saveMatchSession();
+}
+
+function clearDeductions() {
+    soundFX.playClick();
+    state.myDeductionsOnEnemy = [];
+    state.deductionPreviewHead = null;
+    state.lastCombatMessage = `🗑️ Ai șters marcajele de deducere de pe radar.`;
+    updateDeductionControlsUI();
+    renderAttackGrid();
+    updateCombatStatusUI();
+    saveMatchSession();
+}
+
+function cancelDeduction() {
+    soundFX.playClick();
+    state.isDeductionMode = false;
+    state.deductionPreviewHead = null;
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const panel = document.getElementById('combat-deduction-panel');
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active-mode');
+        toggleBtn.textContent = '✏️ DEDUCE / MARCHEAZĂ AVION';
+    }
+    if (panel) panel.classList.add('hidden');
+    renderAttackGrid();
+}
+
+function updateDeductionControlsUI() {
+    const clearBtn = document.getElementById('btn-clear-deductions');
+    const confirmBtn = document.getElementById('btn-confirm-deduction');
+    const hintEl = document.getElementById('deduction-instruction-hint');
+    const dirBtns = document.querySelectorAll('.deduction-dir-btn');
+
+    if (clearBtn) {
+        if (state.myDeductionsOnEnemy && state.myDeductionsOnEnemy.length > 0) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+    }
+
+    dirBtns.forEach(btn => {
+        const orient = btn.dataset.orient;
+        btn.classList.toggle('active', orient === state.deductionPreviewOrient);
+
+        if (state.deductionPreviewHead) {
+            const testCells = calculatePlaneCells(
+                state.deductionPreviewHead.r,
+                state.deductionPreviewHead.c,
+                orient,
+                state.planeVariant
+            );
+            btn.disabled = !isWithinBounds(testCells);
+        } else {
+            btn.disabled = false;
+        }
+    });
+
+    if (confirmBtn) {
+        if (state.deductionPreviewHead) {
+            const currentCells = calculatePlaneCells(
+                state.deductionPreviewHead.r,
+                state.deductionPreviewHead.c,
+                state.deductionPreviewOrient,
+                state.planeVariant
+            );
+            confirmBtn.disabled = !isWithinBounds(currentCells);
+        } else {
+            confirmBtn.disabled = true;
+        }
+    }
+
+    if (hintEl) {
+        if (state.deductionPreviewHead) {
+            const coord = getCoordinateLabel(state.deductionPreviewHead.r * GRID_SIZE + state.deductionPreviewHead.c);
+            const currentCells = calculatePlaneCells(
+                state.deductionPreviewHead.r,
+                state.deductionPreviewHead.c,
+                state.deductionPreviewOrient,
+                state.planeVariant
+            );
+            if (isWithinBounds(currentCells)) {
+                hintEl.innerHTML = `🎯 Cap la <b>${coord}</b> (orientat ${state.deductionPreviewOrient}). Apasă <b>AȘEAZĂ</b>!`;
+            } else {
+                hintEl.innerHTML = `⚠️ Cap la <b>${coord}</b>, dar avionul iese din radar spre ${state.deductionPreviewOrient}. Alege altă direcție!`;
+            }
+        } else {
+            hintEl.innerHTML = '👆 1. Atinge <b>Capul</b> pe radar &nbsp;|&nbsp; 2. Alege direcția și apasă <b>AȘEAZĂ</b>';
+        }
+    }
+}
+
+function initDeductionControls() {
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const clearBtn = document.getElementById('btn-clear-deductions');
+    const confirmBtn = document.getElementById('btn-confirm-deduction');
+    const cancelBtn = document.getElementById('btn-cancel-deduction');
+    const dirBtns = document.querySelectorAll('.deduction-dir-btn');
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            toggleDeductionMode();
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            clearDeductions();
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            confirmDeductionPlacement();
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            cancelDeduction();
+        });
+    }
+
+    dirBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            soundFX.playClick();
+            const orient = e.currentTarget.dataset.orient;
+            state.deductionPreviewOrient = orient;
+            updateDeductionControlsUI();
+            renderAttackGrid();
+        });
+    });
 }
 
 function renderDefenseGrid() {
@@ -1438,12 +1759,23 @@ function resetGameForRematch() {
     state.myPlanes = [];
     state.myShotsOnEnemy = {};
     state.enemyShotsOnMe = {};
+    state.myDeductionsOnEnemy = [];
+    state.isDeductionMode = false;
+    state.deductionPreviewHead = null;
     state.stats = {
         myHits: 0,
         myMisses: 0,
         enemyDownedPlanes: 0,
         myDownedPlanes: 0
     };
+
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const panel = document.getElementById('combat-deduction-panel');
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active-mode', 'pulse-ready');
+        toggleBtn.textContent = '✏️ DEDUCE / MARCHEAZĂ AVION';
+    }
+    if (panel) panel.classList.add('hidden');
 
     showScreen('setup-screen');
     renderSetupGrid();
@@ -2072,6 +2404,9 @@ document.addEventListener('DOMContentLoaded', () => {
             soundBtn.textContent = '🔇';
         }
     }
+
+    // 15. Controale deducere tactică pe radarul de atac
+    initDeductionControls();
 });
 
 // Salvare stare la închiderea paginii și eliberare conexiune PeerJS
