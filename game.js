@@ -827,14 +827,80 @@ function resetGameForRematch() {
 
 // ==========================================
 // 6. INITIALIZARE EVENIMENTE DOM
-// ==========================================
+// Gestionare PWA Install Prompt
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+});
+
+function openInstallModal() {
+    showScreen('install-app-modal');
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Inițializare Temă Dark / Light (Neo-Skeuomorphism)
+    const savedTheme = localStorage.getItem('app_theme') || 'dark';
+    const themeBtn = document.getElementById('btn-toggle-theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        if (themeBtn) themeBtn.textContent = '☀️';
+    } else {
+        if (themeBtn) themeBtn.textContent = '🌙';
+    }
+
+    if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+            soundFX.playClick();
+            const isLight = document.body.classList.toggle('light-theme');
+            themeBtn.textContent = isLight ? '☀️' : '🌙';
+            localStorage.setItem('app_theme', isLight ? 'light' : 'dark');
+        });
+    }
+
+    // Gestionare Modal Instalare Aplicație
+    const installBtn = document.getElementById('btn-open-install-modal');
+    if (installBtn) {
+        installBtn.addEventListener('click', () => {
+            soundFX.playClick();
+            openInstallModal();
+        });
+    }
+
+    const closeInstallBtn = document.getElementById('btn-close-install-modal');
+    if (closeInstallBtn) {
+        closeInstallBtn.addEventListener('click', () => {
+            soundFX.playClick();
+            showScreen('menu-screen');
+        });
+    }
+
+    const pwaInstallBtn = document.getElementById('btn-pwa-install');
+    if (pwaInstallBtn) {
+        pwaInstallBtn.addEventListener('click', async () => {
+            soundFX.playClick();
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                if (outcome === 'accepted') {
+                    showScreen('menu-screen');
+                }
+            } else {
+                alert("Pe Desktop (Chrome, Edge sau Brave): apasă pe pictograma de instalare (⊕) din dreapta barei de adrese URL pentru a descărca aplicația direct pe Desktop!");
+            }
+        });
+    }
+
     // 1. Inițializare parametri URL (ex: ?room=AV88)
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('room');
     if (roomFromUrl) {
         document.getElementById('input-join-room-code').value = roomFromUrl.toUpperCase();
+        // Odată trimis link-ul cu jocul, apare modalul unde jucătorul poate descărca aplicația pe desktop/telefon
+        setTimeout(() => {
+            openInstallModal();
+        }, 500);
     }
 
     // 2. Pre-completare chei Supabase din localStorage sau config.js

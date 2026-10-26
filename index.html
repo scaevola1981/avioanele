@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Jocul de Avioane 8x8 | Multiplayer Online</title>
     <meta name="description" content="Jocul clasic de avioane din copilărie, acum multiplayer online pe o grilă de 8x8 cu Supabase Realtime. Joacă alături de familie și prieteni de pe telefon sau calculator.">
-    <meta name="theme-color" content="#070d18">
+    <meta name="theme-color" content="#0d1b2a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Avioane 8x8">
     <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- Iconițe Aplicație & Manifest PWA -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.json">
     
     <!-- Design & Fonturi -->
     <link rel="stylesheet" href="styles.css">
@@ -19,10 +24,12 @@
     <!-- Header Aplicație -->
     <header class="app-header">
         <div class="logo-container">
-            <span class="logo-icon">✈️</span>
+            <img src="icon.png" alt="Logo Avioane" class="header-logo-badge">
             <h1 class="app-title">AVIOANE 8x8</h1>
         </div>
         <div class="header-actions">
+            <button id="btn-open-install-modal" class="btn-icon" title="Descarcă / Instalează Aplicația" aria-label="Instalează aplicația">📥</button>
+            <button id="btn-toggle-theme" class="btn-icon" title="Comută Temă (Dark / Light)" aria-label="Comută tema">🌙</button>
             <button id="btn-toggle-sound" class="btn-icon" title="Sunet Pornit/Oprit" aria-label="Comută sunetul">🔊</button>
             <button id="btn-open-supabase-settings" class="btn-icon" title="Setări Supabase" aria-label="Setări conexiune Supabase">⚙️</button>
         </div>
@@ -259,6 +266,43 @@
 
             <button id="btn-save-supabase" class="btn-primary">SALVEAZĂ CONEXIUNEA</button>
             <button id="btn-close-supabase-modal" class="btn-secondary">ÎNCHIDE</button>
+        </div>
+    </div>
+
+    <!-- ========================================================
+         MODAL 3: INSTALARE APLICAȚIE (DESKTOP & MOBIL)
+         ======================================================== -->
+    <div id="install-app-modal" class="app-modal hidden">
+        <div class="modal-content neo-card" style="max-width: 440px;">
+            <!-- Iconiță Aplicație cu Ramă Neo-Skeuomorphică -->
+            <div class="app-icon-badge">
+                <img src="icon.png" alt="Avioane 8x8 Iconiță" class="app-icon-img">
+            </div>
+            
+            <h2 class="modal-title" style="font-size: 20px; margin-top: 4px;">Instalează Jocul</h2>
+            <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-top: -6px;">
+                Descarcă aplicația pentru a juca direct pe ecran, fără bara browserului, la viteză maximă!
+            </p>
+
+            <div class="install-instructions-card">
+                <div style="font-weight: 700; font-size: 13px; color: var(--neon-cyan); margin-bottom: 6px;">
+                    🖥️ Pe Calculator / Desktop:
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                    Apasă butonul de mai jos sau pictograma <b>„Instalează” (⊕)</b> din bara de adrese a browserului (Chrome / Edge / Brave).
+                </p>
+                <button id="btn-pwa-install" class="btn-primary" style="margin-bottom: 14px;">📥 INSTALEAZĂ PE DESKTOP</button>
+
+                <div style="font-weight: 700; font-size: 13px; color: var(--neon-gold); margin-bottom: 6px;">
+                    📱 Pe Telefon (iPhone & Android):
+                </div>
+                <ul style="font-size: 12px; color: var(--text-muted); text-align: left; padding-left: 20px; line-height: 1.6;">
+                    <li><b>iPhone (Safari):</b> Apasă pe <b>Partajare (Share ⎋)</b> ➔ <b>„Adaugă pe ecranul principal”</b>.</li>
+                    <li><b>Android (Chrome):</b> Apasă pe meniul <b>⋮</b> ➔ <b>„Instalează aplicația”</b>.</li>
+                </ul>
+            </div>
+
+            <button id="btn-close-install-modal" class="btn-secondary" style="margin-top: 6px;">JOACĂ ÎN BROWSER</button>
         </div>
     </div>
 
