@@ -40,13 +40,22 @@ self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
+  // Pe localhost nu interceptăm deloc pentru a preveni cache vechi în timpul testării
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    return;
+  }
+  // Strategie Network-First cu fallback la cache (ideal pentru jocuri web PWA)
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).then((networkResponse) => {
-        return networkResponse;
-      });
+    fetch(event.request).then((networkResponse) => {
+      if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+        const responseClone = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+      }
+      return networkResponse;
     }).catch(() => {
-      return fetch(event.request);
+      return caches.match(event.request);
     })
   );
 });
