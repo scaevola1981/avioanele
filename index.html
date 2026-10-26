@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Jocul de Avioane 8x8 | Multiplayer Online</title>
+    <meta name="description" content="Jocul clasic de avioane din copilărie, acum multiplayer online pe o grilă de 8x8 cu Supabase Realtime. Joacă alături de familie și prieteni de pe telefon sau calculator.">
+    <meta name="theme-color" content="#070d18">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Avioane 8x8">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Design & Fonturi -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Header Aplicație -->
+    <header class="app-header">
+        <div class="logo-container">
+            <span class="logo-icon">✈️</span>
+            <h1 class="app-title">AVIOANE 8x8</h1>
+        </div>
+        <div class="header-actions">
+            <button id="btn-toggle-sound" class="btn-icon" title="Sunet Pornit/Oprit" aria-label="Comută sunetul">🔊</button>
+            <button id="btn-open-supabase-settings" class="btn-icon" title="Setări Supabase" aria-label="Setări conexiune Supabase">⚙️</button>
+        </div>
+    </header>
+
+    <!-- ========================================================
+         ECRAN 1: MENIU PRINCIPAL & LOBBY
+         ======================================================== -->
+    <main id="menu-screen" class="app-screen">
+        <div class="menu-grid">
+            
+            <!-- Card Gazdă (Host) -->
+            <div class="glass-card">
+                <h2 class="menu-section-title"><span>🚀</span> Creează Misiune (Gazdă)</h2>
+                
+                <!-- Selector Model Avion -->
+                <label style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: block;">Alege Modelul de Avion:</label>
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="plane-variant" value="1" checked>
+                        <div>
+                            <strong style="color: var(--neon-cyan);">Avion Compact (8 căsuțe)</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Aripă față de 3 căsuțe • Permite 2-4 avioane</div>
+                        </div>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="plane-variant" value="2">
+                        <div>
+                            <strong style="color: var(--neon-cyan);">Avion Clasic (10 căsuțe)</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Aripă față de 5 căsuțe • Permite 1-3 avioane</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Selector Număr Avioane -->
+                <label for="select-plane-count" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: block;">Număr Avioane în Flotă:</label>
+                <select id="select-plane-count" class="form-select">
+                    <option value="2">2 Avioane</option>
+                    <option value="3" selected>3 Avioane</option>
+                    <option value="4">4 Avioane</option>
+                </select>
+
+                <button id="btn-create-room" class="btn-primary">CREEAZĂ CAMERA</button>
+            </div>
+
+            <!-- Card Oaspete (Join) -->
+            <div class="glass-card">
+                <h2 class="menu-section-title"><span>🎯</span> Alătură-te unei Misiuni</h2>
+                <label for="input-join-room-code" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: block;">Cod Cameră (4 caractere):</label>
+                <input type="text" id="input-join-room-code" class="form-input" placeholder="Ex: AV88" maxlength="6" style="text-transform: uppercase; font-family: var(--font-display); letter-spacing: 2px;">
+                <button id="btn-join-room" class="btn-primary">INTRĂ ÎN JOC</button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ========================================================
+         ECRAN 2: FAZA DE PLASARE (FLEET SETUP)
+         ======================================================== -->
+    <section id="setup-screen" class="app-screen hidden">
+        <div class="setup-container">
+            
+            <!-- Badge Cameră -->
+            <div class="room-badge-card">
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Cod Cameră</div>
+                    <span id="display-room-code" class="room-code-tag">----</span>
+                </div>
+                <button id="btn-copy-room-link" class="btn-secondary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 14px;">🔗 Copiază Link</button>
+            </div>
+
+            <!-- Stare Conectare Adversar -->
+            <div id="lobby-opponent-status" class="status-indicator">
+                🟡 <span style="color: var(--neon-amber)">În așteptarea adversarului...</span>
+            </div>
+
+            <!-- Info Reguli -->
+            <div style="display: flex; justify-content: space-between; width: 100%; font-size: 13px; color: var(--text-muted); padding: 0 4px;">
+                <span>Model: <b id="setup-rule-variant" style="color: var(--text-primary);">Compact (8)</b></span>
+                <span>Avioane plasate: <b id="setup-rule-count" style="color: var(--neon-cyan);">0 / 3</b></span>
+            </div>
+
+            <!-- Selector Orientare -->
+            <div class="orientation-selector">
+                <button class="btn-orient active" data-orient="N" title="Orientat spre Nord">
+                    <span>▲</span> NORD
+                </button>
+                <button class="btn-orient" data-orient="E" title="Orientat spre Est">
+                    <span>▶</span> EST
+                </button>
+                <button class="btn-orient" data-orient="S" title="Orientat spre Sud">
+                    <span>▼</span> SUD
+                </button>
+                <button class="btn-orient" data-orient="W" title="Orientat spre Vest">
+                    <span>◀</span> VEST
+                </button>
+            </div>
+
+            <!-- Tabla de Plasare 8x8 cu Coordonate -->
+            <div class="radar-frame">
+                <div class="coord-corner"></div>
+                <div class="coord-cols">
+                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                </div>
+                <div class="coord-rows">
+                    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span>
+                </div>
+                <div class="grid-container">
+                    <div id="setup-grid" class="grid-board"></div>
+                </div>
+            </div>
+
+            <!-- Acțiuni Plasare -->
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <button id="btn-randomize-fleet" class="btn-secondary" style="flex: 1;">🎲 Aleatoriu</button>
+                <button id="btn-clear-fleet" class="btn-secondary" style="flex: 1;">🗑️ Șterge Tot</button>
+            </div>
+
+            <!-- Buton Confirmare Gata -->
+            <button id="btn-ready-fleet" class="btn-primary" disabled style="margin-top: 6px;">GATA DE LUPTĂ</button>
+        </div>
+    </section>
+
+    <!-- ========================================================
+         ECRAN 3: FAZA DE LUPTĂ (COMBAT SCREEN)
+         ======================================================== -->
+    <section id="combat-screen" class="app-screen hidden">
+        <div class="combat-hud">
+            
+            <!-- Banner Indicator Tură -->
+            <div id="combat-turn-indicator" class="turn-banner">
+                🎯 Rândul tău!
+            </div>
+
+            <!-- Selector Tab-uri pe Mobil -->
+            <div class="mobile-tabs">
+                <button id="tab-attack" class="tab-btn active">🎯 Radar Țintă</button>
+                <button id="tab-defense" class="tab-btn">🛡️ Flota Mea <span id="defense-alert-dot" class="alert-dot hidden"></span></button>
+            </div>
+
+            <!-- Containere Table de Joc (Dual pe Desktop / Tab pe Mobil) -->
+            <div class="boards-dual-layout">
+                
+                <!-- Tabla de Atac (Tragi în inamic) -->
+                <div id="board-attack-container" class="board-wrapper">
+                    <div class="board-label">
+                        <span>🎯 RADAR ȚINTĂ (INAMIC)</span>
+                        <span>Doborâte: <b id="enemy-planes-down-count" style="color: var(--neon-gold)">0 / 3</b></span>
+                    </div>
+                    <div class="radar-frame">
+                        <div class="coord-corner"></div>
+                        <div class="coord-cols">
+                            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                        </div>
+                        <div class="coord-rows">
+                            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span>
+                        </div>
+                        <div class="grid-container">
+                            <div id="attack-grid" class="grid-board"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Apărare (Avioanele tale) -->
+                <div id="board-defense-container" class="board-wrapper hidden-mobile">
+                    <div class="board-label">
+                        <span>🛡️ FLOTA MEA</span>
+                        <span>În viață: <b id="my-planes-alive-count" style="color: var(--neon-cyan)">3 / 3</b></span>
+                    </div>
+                    <div class="radar-frame">
+                        <div class="coord-corner"></div>
+                        <div class="coord-cols">
+                            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                        </div>
+                        <div class="coord-rows">
+                            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span>
+                        </div>
+                        <div class="grid-container">
+                            <div id="defense-grid" class="grid-board"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ========================================================
+         MODAL 1: FINAL DE MECI (GAMEOVER)
+         ======================================================== -->
+    <div id="gameover-modal" class="app-modal hidden">
+        <div class="modal-content">
+            <h2 id="gameover-title" class="modal-title">VICTORIE!</h2>
+            <p id="gameover-message" style="color: var(--text-muted); font-size: 15px;">Toate avioanele au fost eliminate.</p>
+
+            <div class="stats-box">
+                <div class="stat-item">
+                    <span id="stat-my-hits" class="stat-val">0</span>
+                    <span class="stat-lbl">Lovituri Nimerite</span>
+                </div>
+                <div class="stat-item">
+                    <span id="stat-my-misses" class="stat-val">0</span>
+                    <span class="stat-lbl">Lovituri Ratate</span>
+                </div>
+            </div>
+
+            <button id="btn-request-rematch" class="btn-primary">CERE REVANȘĂ</button>
+            <button id="btn-exit-to-menu" class="btn-secondary">MENIU PRINCIPAL</button>
+        </div>
+    </div>
+
+    <!-- ========================================================
+         MODAL 2: SETĂRI SUPABASE (CONFIGURARE CONEXIUNE)
+         ======================================================== -->
+    <div id="supabase-config-modal" class="app-modal hidden">
+        <div class="modal-content" style="text-align: left;">
+            <h2 class="modal-title" style="color: var(--neon-cyan); font-size: 20px;">⚙️ Conexiune Supabase</h2>
+            <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Pentru a juca multiplayer la distanță între telefoane separate, introdu datele din proiectul tău gratuit Supabase:
+            </p>
+
+            <div style="width: 100%;">
+                <label for="input-supabase-url" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px;">Supabase Project URL:</label>
+                <input type="text" id="input-supabase-url" class="form-input" placeholder="https://xyzproject.supabase.co">
+
+                <label for="input-supabase-key" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px;">Supabase Anon Key (public):</label>
+                <input type="password" id="input-supabase-key" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+            </div>
+
+            <div style="font-size: 11px; color: var(--neon-amber); background: rgba(255, 183, 3, 0.1); padding: 8px 12px; border-radius: 8px; width: 100%;">
+                💡 Datele se salvează în browserul telefonului (localStorage) și nu se transmit nicăieri altundeva.
+            </div>
+
+            <button id="btn-save-supabase" class="btn-primary">SALVEAZĂ CONEXIUNEA</button>
+            <button id="btn-close-supabase-modal" class="btn-secondary">ÎNCHIDE</button>
+        </div>
+    </div>
+
+    <!-- Scripturi -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="sound.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

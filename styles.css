@@ -1,0 +1,909 @@
+/* ========================================================
+   STYLES.CSS - Jocul de Avioane 8x8 (Tactical Radar Glassmorphism)
+   ======================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Outfit:wght@300;400;600;700&display=swap');
+
+:root {
+    --bg-dark: #070d18;
+    --bg-gradient: radial-gradient(circle at 50% 20%, #0d1e38 0%, #060b14 100%);
+    --panel-bg: rgba(13, 27, 44, 0.75);
+    --panel-border: rgba(0, 245, 212, 0.25);
+    --panel-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    
+    --neon-cyan: #00f5d4;
+    --neon-cyan-glow: 0 0 12px rgba(0, 245, 212, 0.6);
+    --neon-emerald: #05d550;
+    --neon-gold: #ffb703;
+    --neon-gold-glow: 0 0 15px rgba(255, 183, 3, 0.8);
+    --neon-crimson: #ff0054;
+    --neon-crimson-glow: 0 0 15px rgba(255, 0, 84, 0.8);
+    
+    --cell-empty: rgba(16, 37, 66, 0.6);
+    --cell-border: rgba(0, 245, 212, 0.15);
+    --text-primary: #f0f4f8;
+    --text-muted: #8da2ba;
+
+    --font-display: 'Orbitron', monospace;
+    --font-ui: 'Outfit', -apple-system, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+body {
+    background: var(--bg-dark);
+    background-image: var(--bg-gradient);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    position: relative;
+    overscroll-behavior-y: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+}
+
+button, .grid-cell, .radio-card, .btn-orient, .tab-btn {
+    touch-action: manipulation;
+}
+
+button:active, .btn-orient:active, .tab-btn:active, .radio-card:active {
+    transform: scale(0.96) !important;
+    transition: transform 0.05s ease !important;
+}
+
+/* Radar Background Grid Pattern */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-image: 
+        linear-gradient(rgba(0, 245, 212, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 212, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ========================================================
+   HEADER & NAVBAR
+   ======================================================== */
+.app-header {
+    width: 100%;
+    max-width: 960px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    font-size: 28px;
+    filter: drop-shadow(var(--neon-cyan-glow));
+    animation: pulseFloat 3s ease-in-out infinite alternate;
+}
+
+.app-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--neon-cyan);
+    text-shadow: var(--neon-cyan-glow);
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-icon {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
+    font-size: 18px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: var(--neon-cyan-glow);
+    transform: translateY(-2px);
+}
+
+/* ========================================================
+   CONTAINERE ȘI CARDURI GLASSMORPHISM
+   ======================================================== */
+.app-screen {
+    width: 100%;
+    max-width: 900px;
+    padding: 0 16px 32px 16px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.glass-card {
+    background: var(--panel-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    box-shadow: var(--panel-glow);
+    padding: 24px;
+    width: 100%;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ========================================================
+   MENIU PRINCIPAL & LOBBY
+   ======================================================== */
+.menu-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 480px;
+}
+
+.menu-section-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--neon-cyan);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.radio-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.radio-card:hover, .radio-card:has(input:checked) {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 245, 212, 0.08);
+}
+
+.radio-card input {
+    accent-color: var(--neon-cyan);
+    width: 18px;
+    height: 18px;
+}
+
+.form-select, .form-input {
+    width: 100%;
+    background: rgba(6, 15, 29, 0.8);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.form-input:focus, .form-select:focus {
+    border-color: var(--neon-cyan);
+    box-shadow: var(--neon-cyan-glow);
+}
+
+.btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, #00f5d4 0%, #00bbf9 100%);
+    color: #031122;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 800;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(0, 245, 212, 0.35);
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 245, 212, 0.55);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 15px;
+    padding: 12px 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--neon-cyan);
+}
+
+/* ========================================================
+   FAZA DE PLASARE (SETUP SCREEN)
+   ======================================================== */
+.setup-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.room-badge-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 245, 212, 0.08);
+    border: 1px dashed var(--neon-cyan);
+    padding: 12px 18px;
+    border-radius: 14px;
+    width: 100%;
+}
+
+.room-code-tag {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--neon-gold);
+    letter-spacing: 2px;
+    text-shadow: var(--neon-gold-glow);
+}
+
+.status-indicator {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 4px 0 10px 0;
+    text-align: center;
+}
+
+/* Selector Orientare */
+.orientation-selector {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.btn-orient {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--panel-border);
+    color: var(--text-muted);
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-orient.active {
+    background: rgba(0, 245, 212, 0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: var(--neon-cyan-glow);
+}
+
+/* ========================================================
+   FRAME RADAR CU COORDONATE (1-8 Orizontal, A-H Vertical)
+   ======================================================== */
+.radar-frame {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    grid-template-rows: 24px 1fr;
+    gap: 4px;
+    width: 100%;
+    max-width: 440px;
+    box-sizing: border-box;
+}
+
+.coord-corner {
+    width: 24px;
+    height: 24px;
+}
+
+.coord-cols {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    padding: 0 10px;
+    height: 24px;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.coord-cols span {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 8px rgba(0, 245, 212, 0.45);
+}
+
+.coord-rows {
+    display: grid;
+    grid-template-rows: repeat(8, 1fr);
+    gap: 4px;
+    padding: 10px 0;
+    width: 24px;
+    align-items: center;
+    justify-items: center;
+    box-sizing: border-box;
+}
+
+.coord-rows span {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-shadow: 0 0 8px rgba(0, 245, 212, 0.45);
+}
+
+/* ========================================================
+   GRILĂ TACTICĂ 8x8
+   ======================================================== */
+.grid-container {
+    width: 100%;
+    aspect-ratio: 1;
+    background: rgba(5, 12, 22, 0.85);
+    border: 2px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 0 25px rgba(0, 245, 212, 0.15), inset 0 0 15px rgba(0, 0, 0, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efect de Radar Scanner */
+.grid-container::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 245, 212, 0.08) 60deg, transparent 90deg);
+    pointer-events: none;
+    animation: radarSweep 6s linear infinite;
+    z-index: 1;
+}
+
+.grid-board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    z-index: 2;
+}
+
+.grid-cell {
+    background: var(--cell-empty);
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    aspect-ratio: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.grid-cell:hover {
+    background: rgba(0, 245, 212, 0.2);
+    border-color: var(--neon-cyan);
+}
+
+/* Previzualizare la plasare */
+.grid-cell.preview-valid {
+    background: rgba(5, 213, 80, 0.45) !important;
+    border-color: var(--neon-emerald) !important;
+}
+
+.grid-cell.preview-invalid {
+    background: rgba(255, 0, 84, 0.45) !important;
+    border-color: var(--neon-crimson) !important;
+}
+
+/* Stiluri căsuțe avion plasat */
+.grid-cell.occupied.plane-head {
+    background: linear-gradient(135deg, #ffb703 0%, #fb8500 100%);
+    color: #050d1a;
+    font-weight: 900;
+    box-shadow: var(--neon-gold-glow);
+    border-color: #fff;
+    z-index: 3;
+}
+
+.grid-cell.occupied.plane-wing,
+.grid-cell.occupied.plane-body,
+.grid-cell.occupied.plane-tail {
+    background: rgba(0, 245, 212, 0.4);
+    border-color: var(--neon-cyan);
+}
+
+/* Stiluri celule în faza de luptă */
+.attack-cell:hover {
+    background: rgba(255, 183, 3, 0.25);
+    border-color: var(--neon-gold);
+    cursor: crosshair;
+}
+
+.cell-shot.shot-miss {
+    background: rgba(40, 60, 90, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #5c7899;
+    font-size: 24px;
+}
+
+.cell-shot.shot-hit {
+    background: radial-gradient(circle, #ff0054 20%, #7a0028 100%);
+    border-color: var(--neon-crimson);
+    box-shadow: var(--neon-crimson-glow);
+    animation: impactPop 0.3s ease-out;
+}
+
+.cell-shot.shot-plane_body_down {
+    background: rgba(255, 183, 3, 0.35);
+    border-color: var(--neon-gold);
+}
+
+.cell-shot.shot-head {
+    background: radial-gradient(circle, #ffb703 30%, #b84300 100%);
+    border-color: #fff;
+    box-shadow: var(--neon-gold-glow);
+    animation: impactPop 0.4s ease-out, goldPulse 1.5s infinite alternate;
+}
+
+.my-plane-cell {
+    background: rgba(0, 245, 212, 0.25);
+    border-color: var(--neon-cyan);
+}
+
+.my-plane-cell.plane-head {
+    background: var(--neon-gold);
+    color: #031122;
+    font-weight: 800;
+}
+
+.plane-destroyed {
+    background: rgba(255, 0, 84, 0.5) !important;
+    border-color: var(--neon-crimson) !important;
+}
+
+/* ========================================================
+   FAZA DE LUPTĂ (COMBAT SCREEN)
+   ======================================================== */
+.combat-hud {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.turn-banner {
+    background: rgba(13, 27, 44, 0.9);
+    border: 1px solid var(--panel-border);
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 16px;
+    box-shadow: var(--panel-glow);
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+/* Selector Tab-uri pe Mobil */
+.mobile-tabs {
+    display: flex;
+    width: 100%;
+    max-width: 420px;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--panel-border);
+    color: var(--text-muted);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: var(--panel-bg);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: var(--neon-cyan-glow);
+}
+
+.boards-dual-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+}
+
+@media (min-width: 820px) {
+    .boards-dual-layout {
+        flex-direction: row;
+        justify-content: center;
+        gap: 32px;
+    }
+    .mobile-tabs {
+        display: none !important;
+    }
+    .hidden-mobile {
+        display: block !important;
+    }
+}
+
+@media (max-width: 819px) {
+    .hidden-mobile {
+        display: none !important;
+    }
+}
+
+.board-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 420px;
+}
+
+.board-label {
+    font-family: var(--font-display);
+    font-size: 15px;
+    color: var(--neon-cyan);
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 4px;
+}
+
+/* ========================================================
+   MODALE (GameOver, Supabase Config)
+   ======================================================== */
+.app-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(3, 8, 16, 0.85);
+    backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    padding: 20px;
+}
+
+.modal-content {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+}
+
+.stats-box {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-val {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+}
+
+.stat-lbl {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ========================================================
+   ANIMAȚII
+   ======================================================== */
+@keyframes radarSweep {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulseFloat {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-3px); }
+}
+
+@keyframes impactPop {
+    0% { transform: scale(0.6); opacity: 0.5; }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes goldPulse {
+    0% { box-shadow: 0 0 10px rgba(255, 183, 3, 0.5); }
+    100% { box-shadow: 0 0 25px rgba(255, 183, 3, 0.95); }
+}
+
+@keyframes modalPop {
+    0% { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.pulse-ready {
+    animation: readyGlow 1.5s infinite alternate;
+}
+
+@keyframes readyGlow {
+    0% { box-shadow: 0 4px 15px rgba(0, 245, 212, 0.4); }
+    100% { box-shadow: 0 6px 25px rgba(0, 245, 212, 0.85); }
+}
+
+/* ========================================================
+   ALERT NOTIFICATION DOT (PENTRU TELEFON)
+   ======================================================== */
+.alert-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    background: var(--neon-crimson);
+    border-radius: 50%;
+    box-shadow: 0 0 10px #ff0054;
+    margin-left: 6px;
+    vertical-align: middle;
+    animation: alertPulse 0.8s infinite alternate;
+}
+
+@keyframes alertPulse {
+    from { transform: scale(0.85); opacity: 0.7; }
+    to { transform: scale(1.3); opacity: 1; }
+}
+
+/* ========================================================
+   OPTIMIZĂRI DEDICATE PENTRU TELEFOANE MOBILE (<= 600px)
+   ======================================================== */
+@media (max-width: 600px) {
+    .app-header {
+        padding: 10px 14px;
+        margin-bottom: 2px;
+    }
+
+    .logo-icon {
+        font-size: 22px;
+    }
+
+    .app-title {
+        font-size: 17px;
+        letter-spacing: 1px;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        font-size: 16px;
+    }
+
+    .app-screen {
+        padding: 0 10px 16px 10px;
+    }
+
+    .glass-card {
+        padding: 16px 14px;
+        border-radius: 14px;
+    }
+
+    .setup-container {
+        gap: 10px;
+        max-width: 100%;
+    }
+
+    .room-badge-card {
+        padding: 8px 12px;
+        border-radius: 10px;
+    }
+
+    .room-code-tag {
+        font-size: 19px;
+    }
+
+    .orientation-selector {
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .btn-orient {
+        padding: 8px 2px;
+        font-size: 11px;
+        border-radius: 8px;
+    }
+
+    .radar-frame {
+        max-width: min(92vw, 370px);
+        gap: 2px;
+    }
+
+    .coord-cols {
+        height: 20px;
+    }
+
+    .coord-cols span {
+        font-size: 11px;
+    }
+
+    .coord-rows {
+        width: 20px;
+    }
+
+    .coord-rows span {
+        font-size: 11px;
+    }
+
+    .coord-corner {
+        width: 20px;
+        height: 20px;
+    }
+
+    .grid-container {
+        padding: 6px;
+        border-radius: 12px;
+        border-width: 1.5px;
+    }
+
+    .grid-board {
+        gap: 3px;
+    }
+
+    .grid-cell {
+        border-radius: 4px;
+        font-size: 15px;
+    }
+
+    .turn-banner {
+        padding: 8px 14px;
+        font-size: 13px;
+        border-radius: 18px;
+    }
+
+    .mobile-tabs {
+        max-width: min(92vw, 370px);
+        margin-bottom: 4px;
+    }
+
+    .tab-btn {
+        padding: 9px 6px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+
+    .btn-primary {
+        padding: 12px 16px;
+        font-size: 14px;
+        border-radius: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 14px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+}
