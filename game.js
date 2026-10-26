@@ -701,13 +701,6 @@ function handleIncomingShot(cellIndex) {
     renderDefenseGrid();
     updateCombatStatusUI();
 
-    // Dacă pe telefon utilizatorul e pe tab-ul de atac, aprinde bulina de alertă pe tab-ul flotei
-    const defTab = document.getElementById('tab-defense');
-    const dot = document.getElementById('defense-alert-dot');
-    if (dot && defTab && !defTab.classList.contains('active')) {
-        dot.classList.remove('hidden');
-    }
-
     if (allDestroyed) {
         // Am pierdut toate avioanele -> Înfrângere
         setTimeout(() => {
@@ -1845,26 +1838,7 @@ document.addEventListener('DOMContentLoaded', () => {
         checkBothReadyToStart();
     });
 
-    // 12. Comutator Tab-uri pe mobil în timpul luptei (Radar Atac vs Flota Mea)
-    document.getElementById('tab-attack').addEventListener('click', () => {
-        soundFX.playClick();
-        document.getElementById('tab-attack').classList.add('active');
-        document.getElementById('tab-defense').classList.remove('active');
-        document.getElementById('board-attack-container').classList.remove('hidden-mobile');
-        document.getElementById('board-defense-container').classList.add('hidden-mobile');
-    });
-
-    document.getElementById('tab-defense').addEventListener('click', () => {
-        soundFX.playClick();
-        document.getElementById('tab-defense').classList.add('active');
-        document.getElementById('tab-attack').classList.remove('active');
-        document.getElementById('board-defense-container').classList.remove('hidden-mobile');
-        document.getElementById('board-attack-container').classList.add('hidden-mobile');
-        const dot = document.getElementById('defense-alert-dot');
-        if (dot) dot.classList.add('hidden');
-    });
-
-    // 13. Butoane Meci Încheiat (Revanșă & Ieșire)
+    // 12. Butoane Meci Încheiat (Revanșă & Ieșire)
     document.getElementById('btn-request-rematch').addEventListener('click', () => {
         soundFX.playClick();
         document.getElementById('btn-request-rematch').textContent = '⏳ Cerere Trimisă...';

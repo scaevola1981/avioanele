@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=7) -->
-    <link rel="stylesheet" href="styles.css?v=7">
+    <!-- Design & Fonturi (cu cache-busting v=8) -->
+    <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -222,37 +222,11 @@
                 🎯 Rândul tău!
             </div>
 
-            <!-- Selector Tab-uri pe Mobil -->
-            <div class="mobile-tabs">
-                <button id="tab-attack" class="tab-btn active">🎯 Radar Țintă</button>
-                <button id="tab-defense" class="tab-btn">🛡️ Flota Mea <span id="defense-alert-dot" class="alert-dot hidden"></span></button>
-            </div>
-
-            <!-- Containere Table de Joc (Dual pe Desktop / Tab pe Mobil) -->
+            <!-- Containere Table de Joc (Ambele vizibile simultan pe aceeași pagină) -->
             <div class="boards-dual-layout">
                 
-                <!-- Tabla de Atac (Tragi în inamic) -->
-                <div id="board-attack-container" class="board-wrapper">
-                    <div class="board-label">
-                        <span>🎯 RADAR ȚINTĂ (<span id="combat-opp-name" style="color: var(--neon-cyan)">INAMIC</span>)</span>
-                        <span>Doborâte: <b id="enemy-planes-down-count" style="color: var(--neon-gold)">0 / 3</b></span>
-                    </div>
-                    <div class="radar-frame">
-                        <div class="coord-corner"></div>
-                        <div class="coord-cols">
-                            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-                        </div>
-                        <div class="coord-rows">
-                            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span>
-                        </div>
-                        <div class="grid-container">
-                            <div id="attack-grid" class="grid-board"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tabla de Apărare (Avioanele tale) -->
-                <div id="board-defense-container" class="board-wrapper hidden-mobile">
+                <!-- 1. Tabla de Apărare (Flota Ta - Căsuțele cu avioanele tale) -->
+                <div id="board-defense-container" class="board-wrapper">
                     <div class="board-label">
                         <span>🛡️ FLOTA MEA (<span id="combat-my-name" style="color: var(--neon-cyan)">TU</span>)</span>
                         <span>În viață: <b id="my-planes-alive-count" style="color: var(--neon-cyan)">3 / 3</b></span>
@@ -267,6 +241,26 @@
                         </div>
                         <div class="grid-container">
                             <div id="defense-grid" class="grid-board"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Tabla de Atac (Radar Țintă - Terenul gol unde dai loviturile) -->
+                <div id="board-attack-container" class="board-wrapper">
+                    <div class="board-label">
+                        <span>🎯 RADAR ATAC (<span id="combat-opp-name" style="color: var(--neon-gold)">INAMIC</span>)</span>
+                        <span>Doborâte: <b id="enemy-planes-down-count" style="color: var(--neon-gold)">0 / 3</b></span>
+                    </div>
+                    <div class="radar-frame">
+                        <div class="coord-corner"></div>
+                        <div class="coord-cols">
+                            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                        </div>
+                        <div class="coord-rows">
+                            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span>
+                        </div>
+                        <div class="grid-container">
+                            <div id="attack-grid" class="grid-board"></div>
                         </div>
                     </div>
                 </div>
@@ -372,16 +366,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=7) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=8) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=7"></script>
-    <script src="game.js?v=7"></script>
+    <script src="sound.js?v=8"></script>
+    <script src="game.js?v=8"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=7')
+                navigator.serviceWorker.register('./sw.js?v=8')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });
