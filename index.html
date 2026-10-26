@@ -21,8 +21,8 @@
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=18) -->
-    <link rel="stylesheet" href="styles.css?v=18">
+    <!-- Design & Fonturi (cu cache-busting v=19) -->
+    <link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
 
@@ -272,43 +272,36 @@
                         </div>
                     </div>
 
-                    <!-- Instrument Deducere & Marcaj Manual Avioane Doborâte -->
+                    <!-- Instrument Deducere & Marcaj Manual Avioane Doborâte (Căsuță cu Căsuță) -->
                     <div class="deduction-controls-wrapper">
                         <div class="deduction-toggle-row">
                             <button id="btn-toggle-deduction-mode" class="btn-deduction-toggle" type="button">
-                                ✏️ DEDUCE / MARCHEAZĂ AVION
+                                ✏️ DESENEAZĂ CONTUR AVION
                             </button>
                             <button id="btn-clear-deductions" class="btn-deduction-clear hidden" type="button">
                                 🗑️ Șterge Marcaje
                             </button>
                         </div>
 
-                        <!-- Panou interactiv de orientare & așezare -->
+                        <!-- Panou interactiv de desenare manuală căsuță cu căsuță -->
                         <div id="combat-deduction-panel" class="combat-deduction-panel hidden">
                             <div id="deduction-instruction-hint" class="deduction-hint">
-                                👆 1. Atinge <b>Capul</b> pe radar &nbsp;|&nbsp; 2. Alege direcția:
+                                👆 Atinge căsuțele pe radar (una câte una) unde crezi că se află avionul:
                             </div>
-                            <div id="deduction-orientations-bar" class="deduction-orientations-bar">
-                                <button class="deduction-dir-btn" data-orient="N" type="button" aria-label="Direcția Nord">
-                                    <span class="dir-arrow">⬆️</span>
-                                    <span class="dir-name">NORD</span>
-                                </button>
-                                <button class="deduction-dir-btn" data-orient="S" type="button" aria-label="Direcția Sud">
-                                    <span class="dir-arrow">⬇️</span>
-                                    <span class="dir-name">SUD</span>
-                                </button>
-                                <button class="deduction-dir-btn" data-orient="W" type="button" aria-label="Direcția Vest">
-                                    <span class="dir-arrow">⬅️</span>
-                                    <span class="dir-name">VEST</span>
-                                </button>
-                                <button class="deduction-dir-btn" data-orient="E" type="button" aria-label="Direcția Est">
-                                    <span class="dir-arrow">➡️</span>
-                                    <span class="dir-name">EST</span>
-                                </button>
+
+                            <div id="deduction-counter-box" class="deduction-counter-box">
+                                <span>Căsuțe conturate:</span>
+                                <b id="deduction-selected-count">0</b>
+                                <span>/</span>
+                                <span id="deduction-target-count">7</span>
                             </div>
+
                             <div class="deduction-actions-bar">
                                 <button id="btn-confirm-deduction" class="btn-primary" type="button" disabled>
                                     ✅ AȘEAZĂ
+                                </button>
+                                <button id="btn-reset-draft" class="btn-secondary" type="button">
+                                    🔄 Resetează
                                 </button>
                                 <button id="btn-cancel-deduction" class="btn-secondary" type="button">
                                     ÎNCHIDE
@@ -477,16 +470,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=18) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=19) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=18"></script>
-    <script src="game.js?v=18"></script>
+    <script src="sound.js?v=19"></script>
+    <script src="game.js?v=19"></script>
 
     <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=18')
+                navigator.serviceWorker.register('./sw.js?v=19')
                     .then(reg => {
                         console.log('ServiceWorker PWA activat:', reg.scope);
                         reg.update();

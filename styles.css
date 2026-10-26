@@ -1009,33 +1009,34 @@ body.light-theme .defense-cell.shot-head {
 }
 
 /* ========================================================
-   7.1 DEDUCERE ȘI MARCAJ MANUAL AVIOANE PE RADAR ATAC
+   7.1 DEDUCERE ȘI MARCAJ MANUAL AVIOANE PE RADAR ATAC (CĂSUȚĂ CU CĂSUȚĂ)
    ======================================================== */
 .deduced-plane-cell {
-    background: rgba(0, 245, 212, 0.12) !important;
-    border: 1.5px dashed rgba(0, 245, 212, 0.6) !important;
+    background: rgba(0, 245, 212, 0.14) !important;
+    border: 2px dashed rgba(0, 245, 212, 0.75) !important;
 }
 
-.deduced-plane-cell.deduced-head {
-    background: rgba(255, 183, 3, 0.25) !important;
-    border: 2px dashed var(--neon-gold) !important;
+body.light-theme .deduced-plane-cell {
+    background: rgba(0, 119, 182, 0.14) !important;
+    border: 2px dashed rgba(0, 119, 182, 0.75) !important;
 }
 
-.deduced-plane-cell.deduced-wing {
-    border-style: dotted !important;
+.deduction-draft-cell {
+    background: rgba(0, 245, 212, 0.3) !important;
+    border: 2px dashed #ffffff !important;
+    box-shadow: inset 0 0 8px rgba(0, 245, 212, 0.5), 0 0 8px var(--neon-cyan) !important;
+    animation: draftPulse 1.2s infinite alternate;
 }
 
-.deduction-preview-cell {
-    background: rgba(0, 245, 212, 0.28) !important;
-    border: 2px dashed var(--neon-cyan) !important;
+@keyframes draftPulse {
+    from { border-color: rgba(0, 245, 212, 0.7); box-shadow: 0 0 4px var(--neon-cyan); }
+    to { border-color: #ffffff; box-shadow: 0 0 12px var(--neon-cyan); }
 }
 
-.deduction-preview-cell.preview-head,
-.deduction-active-head {
-    background: radial-gradient(circle, #ffb703 30%, #fb8500 100%) !important;
-    border: 2px solid #ffffff !important;
-    color: #031122 !important;
-    font-weight: 800;
+body.light-theme .deduction-draft-cell {
+    background: rgba(0, 119, 182, 0.22) !important;
+    border: 2px dashed #0077b6 !important;
+    box-shadow: inset 0 0 8px rgba(0, 119, 182, 0.35), 0 0 8px rgba(0, 119, 182, 0.6) !important;
 }
 
 .attack-cell.deduction-clickable {
@@ -1045,16 +1046,6 @@ body.light-theme .defense-cell.shot-head {
 .attack-cell.deduction-clickable:hover {
     outline: 2px dashed var(--neon-cyan);
     outline-offset: -2px;
-}
-
-body.light-theme .deduced-plane-cell {
-    background: rgba(0, 119, 182, 0.12) !important;
-    border: 1.5px dashed rgba(0, 119, 182, 0.6) !important;
-}
-
-body.light-theme .deduced-plane-cell.deduced-head {
-    background: rgba(255, 183, 3, 0.25) !important;
-    border: 2px dashed #d00000 !important;
 }
 
 .deduction-controls-wrapper {
@@ -1162,101 +1153,53 @@ body.light-theme .deduction-hint {
     color: #0f172a;
 }
 
-.deduction-orientations-bar {
+.deduction-counter-box {
     display: flex;
-    gap: 10px;
-    justify-content: center;
-    width: 100%;
-    max-width: 380px;
-    box-sizing: border-box;
-}
-
-.deduction-dir-btn {
-    flex: 1;
-    min-width: 60px;
-    min-height: 54px;
-    background: var(--neo-button-bg);
-    color: var(--text-main);
-    border: 2px solid var(--neo-border);
-    box-shadow: var(--neo-button-shadow);
-    border-radius: 12px;
-    padding: 8px 6px;
-    display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
+    gap: 8px;
+    background: var(--cell-empty);
+    border: 1.5px solid var(--neo-border);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    box-shadow: var(--neo-inset-shadow);
+    transition: all 0.25s ease;
 }
 
-.deduction-dir-btn .dir-arrow {
-    font-size: 20px;
-    line-height: 1;
-    transition: transform 0.2s ease;
+.deduction-counter-box b {
+    color: var(--neon-cyan);
+    font-size: 19px;
 }
 
-.deduction-dir-btn .dir-name {
-    font-family: var(--font-military), system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    line-height: 1;
+.deduction-counter-box.count-complete {
+    border-color: var(--neon-gold);
+    box-shadow: 0 0 14px rgba(255, 183, 3, 0.45);
 }
 
-.deduction-dir-btn.active {
-    background: linear-gradient(135deg, #00f5d4 0%, #00b4d8 100%) !important;
-    color: #031122 !important;
-    border-color: #ffffff !important;
-    box-shadow: 0 0 16px rgba(0, 245, 212, 0.8), 0 4px 10px rgba(0, 0, 0, 0.3) !important;
-    transform: translateY(-2px) scale(1.06);
+.deduction-counter-box.count-complete b {
+    color: var(--neon-gold);
 }
 
-.deduction-dir-btn.active .dir-arrow,
-.deduction-dir-btn.active .dir-name {
-    color: #031122 !important;
-}
-
-.deduction-dir-btn:not(.active):not(:disabled):hover,
-.deduction-dir-btn:not(.active):not(:disabled):active {
-    border-color: var(--neon-cyan);
-    background: rgba(0, 245, 212, 0.12);
-    transform: translateY(-1px);
-}
-
-.deduction-dir-btn:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-    filter: grayscale(0.85);
-    border-style: dashed;
-    transform: none !important;
-}
-
-body.light-theme .deduction-dir-btn {
-    background: #f1f5f9;
+body.light-theme .deduction-counter-box {
+    background: #f8fafc;
+    border-color: #cbd5e1;
     color: #0f172a;
-    border: 2px solid #cbd5e1;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
-body.light-theme .deduction-dir-btn:not(.active):not(:disabled):hover {
-    border-color: #0077b6;
-    background: #e2e8f0;
+body.light-theme .deduction-counter-box b {
+    color: #0077b6;
 }
 
-body.light-theme .deduction-dir-btn.active {
-    background: linear-gradient(135deg, #0077b6 0%, #023e8a 100%) !important;
-    color: #ffffff !important;
-    border-color: #00b4d8 !important;
-    box-shadow: 0 4px 14px rgba(0, 119, 182, 0.5), 0 0 12px rgba(0, 180, 216, 0.4) !important;
-    transform: translateY(-2px) scale(1.06);
+body.light-theme .deduction-counter-box.count-complete {
+    border-color: #2a9d8f;
+    box-shadow: 0 0 12px rgba(42, 157, 143, 0.4);
 }
 
-body.light-theme .deduction-dir-btn.active .dir-arrow,
-body.light-theme .deduction-dir-btn.active .dir-name {
-    color: #ffffff !important;
+body.light-theme .deduction-counter-box.count-complete b {
+    color: #2a9d8f;
 }
 
 .deduction-actions-bar {
@@ -1292,6 +1235,24 @@ body.light-theme #btn-confirm-deduction {
     font-size: 14px !important;
     font-weight: 700 !important;
     border-radius: 12px !important;
+}
+
+#btn-reset-draft {
+    flex: 1;
+    min-height: 50px;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    background: rgba(255, 183, 3, 0.15) !important;
+    color: var(--neon-gold) !important;
+    border: 1.5px solid var(--neon-gold) !important;
+}
+
+body.light-theme #btn-reset-draft {
+    background: rgba(251, 133, 0, 0.12) !important;
+    color: #b45309 !important;
+    border-color: #b45309 !important;
 }
 
 /* ========================================================
