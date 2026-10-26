@@ -257,6 +257,33 @@ body::before {
     letter-spacing: 0.8px;
 }
 
+.resume-card {
+    background: var(--neo-surface);
+    border: 2px solid var(--neon-gold);
+    border-radius: 18px;
+    box-shadow: var(--neo-raised-shadow), 0 0 15px rgba(255, 183, 3, 0.2);
+    padding: 14px 18px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    animation: goldPulse 2s infinite alternate;
+}
+
+.reconnect-indicator {
+    background: rgba(255, 183, 3, 0.15);
+    border: 1px solid var(--neon-gold);
+    color: var(--neon-gold);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-align: center;
+    width: 100%;
+    max-width: 420px;
+    animation: alertPulse 1.2s infinite alternate;
+}
+
 .menu-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -809,7 +836,7 @@ body.light-theme .grid-cell.occupied.plane-tail {
 }
 
 /* ========================================================
-   9. MODALE (GameOver, Supabase Config, Install App)
+   9. MODALE (GameOver, Invitație, Install App)
    ======================================================== */
 .app-modal {
     position: fixed;

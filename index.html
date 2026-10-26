@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Jocul de Avioane 8x8 | Multiplayer Online</title>
-    <meta name="description" content="Jocul clasic de avioane din copilărie, acum multiplayer online pe o grilă de 8x8 cu Supabase Realtime. Joacă alături de familie și prieteni de pe telefon sau calculator.">
+    <meta name="description" content="Jocul clasic de avioane din copilărie, acum multiplayer online pe o grilă de 8x8 prin WebRTC P2P (PeerJS). Joacă alături de familie și prieteni de pe telefon sau calculator.">
     <meta name="theme-color" content="#0d1b2a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=4) -->
-    <link rel="stylesheet" href="styles.css?v=4">
+    <!-- Design & Fonturi (cu cache-busting v=5) -->
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -30,7 +30,6 @@
         <div class="header-actions">
             <button id="btn-toggle-theme" class="btn-icon" title="Comută Temă (Dark / Light)" aria-label="Comută tema">🌙</button>
             <button id="btn-toggle-sound" class="btn-icon" title="Sunet Pornit/Oprit" aria-label="Comută sunetul">🔊</button>
-            <button id="btn-open-supabase-settings" class="btn-icon" title="Setări Supabase" aria-label="Setări conexiune Supabase">⚙️</button>
         </div>
     </header>
 
@@ -39,6 +38,20 @@
          ======================================================== -->
     <main id="menu-screen" class="app-screen">
         
+        <!-- Banner Reia Meci În Desfășurare (Persistență sesiune) -->
+        <div id="resume-session-banner" class="resume-card hidden">
+            <div style="font-size: 13px; font-weight: 700; color: var(--neon-gold); display: flex; align-items: center; gap: 6px;">
+                <span>⚡</span> MECI ÎN DESFĂȘURARE DETECTAT!
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0 10px 0;">
+                Ai un meci neterminat în camera <b id="resume-room-code" style="color: var(--neon-cyan);">----</b> (<span id="resume-role-text">Gazdă</span>).
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-resume-game" class="btn-primary" style="padding: 10px 14px; font-size: 13px; flex: 1;">▶️ REIA JOCUL</button>
+                <button id="btn-discard-session" class="btn-secondary" style="padding: 10px 12px; font-size: 13px; width: auto;">Renunță</button>
+            </div>
+        </div>
+
         <!-- Numele Pilotului (Profil) -->
         <div class="pilot-profile-card">
             <label for="input-pilot-name" class="pilot-name-label">
@@ -180,6 +193,11 @@
     <section id="combat-screen" class="app-screen hidden">
         <div class="combat-hud">
             
+            <!-- Banner Reconectare Sesiune / WebRTC -->
+            <div id="reconnect-banner" class="reconnect-indicator hidden">
+                ⚠️ Conexiunea a fost întreruptă. Se reconectează automat...
+            </div>
+
             <!-- Banner Indicator Tură -->
             <div id="combat-turn-indicator" class="turn-banner">
                 🎯 Rândul tău!
@@ -264,35 +282,8 @@
     </div>
 
     <!-- ========================================================
-         MODAL 2: SETĂRI SUPABASE (CONFIGURARE CONEXIUNE)
-         ======================================================== -->
-    <div id="supabase-config-modal" class="app-modal hidden">
-        <div class="modal-content" style="text-align: left;">
-            <h2 class="modal-title" style="color: var(--neon-cyan); font-size: 20px;">⚙️ Conexiune Supabase</h2>
-            <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-                Pentru a juca multiplayer la distanță între telefoane separate, introdu datele din proiectul tău gratuit Supabase:
-            </p>
-
-            <div style="width: 100%;">
-                <label for="input-supabase-url" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px;">Supabase Project URL:</label>
-                <input type="text" id="input-supabase-url" class="form-input" placeholder="https://xyzproject.supabase.co">
-
-                <label for="input-supabase-key" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px;">Supabase Anon Key (public):</label>
-                <input type="password" id="input-supabase-key" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
-            </div>
-
-            <div style="font-size: 11px; color: var(--neon-amber); background: rgba(255, 183, 3, 0.1); padding: 8px 12px; border-radius: 8px; width: 100%;">
-                💡 Datele se salvează în browserul telefonului (localStorage) și nu se transmit nicăieri altundeva.
-            </div>
-
-            <button id="btn-save-supabase" class="btn-primary">SALVEAZĂ CONEXIUNEA</button>
-            <button id="btn-close-supabase-modal" class="btn-secondary">ÎNCHIDE</button>
-        </div>
-    </div>
-
-    <!-- ========================================================
-         MODAL 3: INVITAȚIE MISIUNE (PENTRU LINKUL TRIMIS JUCĂTORULUI)
-         Conține conform cerinței:
+         MODAL 2: INVITAȚIE MISIUNE (PENTRU LINKUL TRIMIS JUCĂTORULUI)
+         Conține:
          1. Butonul JOACĂ
          2. Butonul DESCARCĂ APLICAȚIA
          3. NUMELE (folosit pentru ca celălalt jucător să știe numele celuilalt)
@@ -347,10 +338,9 @@
         </div>
     </div>
 
-    <!-- Scripturi (cu cache-busting v=4) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=4"></script>
-    <script src="sound.js?v=4"></script>
-    <script src="game.js?v=4"></script>
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=5) -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="sound.js?v=5"></script>
+    <script src="game.js?v=5"></script>
 </body>
 </html>

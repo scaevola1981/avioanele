@@ -1,6 +1,7 @@
 /**
  * game.js - Logica completă pentru Jocul de Avioane 8x8
- * Multiplayer Online prin Supabase Realtime (Broadcast & Presence)
+ * Multiplayer Online P2P WebRTC prin PeerJS (fără conturi sau baze de date)
+ * Cu persistență de sesiune automată (ține minte meciul neterminat)
  */
 
 const GRID_SIZE = 8;
@@ -24,8 +25,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 // Starea globală a jocului
 const state = {
-    supabaseClient: null,
-    channel: null,
+    peer: null,
+    activeConn: null,
+    isReconnecting: false,
     roomCode: '',
     role: null, // 'host' | 'guest'
     playerName: localStorage.getItem('pilot_name') || 'Comandant',
@@ -144,150 +146,334 @@ function collidesWithExisting(cells, existingPlanes, excludeIndex = null) {
 }
 
 // ==========================================
-// 2. SUPABASE INITIALIZARE & REALTIME
+// 2. WEBRTC P2P (PEERJS) & PERSISTENȚĂ SESIUNE
+// Fără servere, fără conturi, direct între telefoane!
 // ==========================================
 
-function getSupabaseCredentials() {
-    let url = localStorage.getItem('supabase_url') || (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || '';
-    let key = localStorage.getItem('supabase_anon_key') || (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_ANON_KEY) || '';
-    return { url: url.trim(), key: key.trim() };
-}
+const SESSION_STORAGE_KEY = 'avioane_active_session';
 
-function initSupabase(showModalIfMissing = true) {
-    const { url, key } = getSupabaseCredentials();
-    if (!url || !key) {
-        if (showModalIfMissing) {
-            showScreen('supabase-config-modal');
-        }
-        return false;
+function saveMatchSession() {
+    if (state.phase === 'MENU' || state.phase === 'GAMEOVER') {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        return;
     }
+    const session = {
+        roomCode: state.roomCode,
+        role: state.role,
+        playerName: state.playerName,
+        opponentName: state.opponentName,
+        phase: state.phase,
+        planeVariant: state.planeVariant,
+        planeCount: state.planeCount,
+        myPlanes: state.myPlanes,
+        myReady: state.myReady,
+        opponentReady: state.opponentReady,
+        currentTurn: state.currentTurn,
+        myShotsOnEnemy: state.myShotsOnEnemy,
+        enemyShotsOnMe: state.enemyShotsOnMe,
+        lastCombatMessage: state.lastCombatMessage,
+        stats: state.stats,
+        timestamp: Date.now()
+    };
     try {
-        if (!state.supabaseClient) {
-            state.supabaseClient = supabase.createClient(url, key, {
-                realtime: {
-                    params: {
-                        eventsPerSecond: 20
-                    }
-                }
-            });
-        }
-        return true;
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
     } catch (e) {
-        console.warn("Atenție la inițializarea Supabase:", e);
-        if (showModalIfMissing) {
-            alert("Datele Supabase nu sunt valide. Verifică URL-ul și cheia Anon!");
-            showScreen('supabase-config-modal');
-        }
-        return false;
+        console.warn("Eroare salvare sesiune:", e);
     }
 }
 
-function connectToRoom(code, role) {
+function clearMatchSession() {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+function getActiveSession() {
+    try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) return null;
+        const session = JSON.parse(raw);
+        // Validă timp de 12 ore
+        if (Date.now() - session.timestamp < 12 * 60 * 60 * 1000) {
+            return session;
+        }
+    } catch (e) {
+        console.warn(e);
+    }
+    return null;
+}
+
+function resumeMatch(session) {
+    if (!session) return;
+    state.roomCode = session.roomCode;
+    state.role = session.role;
+    state.playerName = session.playerName || state.playerName;
+    state.opponentName = session.opponentName || 'Adversar';
+    state.planeVariant = session.planeVariant;
+    state.planeCount = session.planeCount;
+    state.myPlanes = session.myPlanes || [];
+    state.myReady = session.myReady || false;
+    state.opponentReady = session.opponentReady || false;
+    state.currentTurn = session.currentTurn || 'host';
+    state.myShotsOnEnemy = session.myShotsOnEnemy || {};
+    state.enemyShotsOnMe = session.enemyShotsOnMe || {};
+    state.lastCombatMessage = session.lastCombatMessage || '';
+    state.stats = session.stats || state.stats;
+    state.phase = session.phase;
+
+    const displayCode = document.getElementById('display-room-code');
+    if (displayCode) displayCode.textContent = session.roomCode;
+    updatePlayerNamesUI();
+
+    if (session.phase === 'BATTLE') {
+        showScreen('combat-screen');
+        renderAttackGrid();
+        renderDefenseGrid();
+        updateCombatStatusUI();
+    } else {
+        showScreen('setup-screen');
+        renderSetupGrid();
+        updateSetupUI();
+        if (state.myReady) {
+            const readyBtn = document.getElementById('btn-ready-fleet');
+            if (readyBtn) {
+                readyBtn.disabled = true;
+                readyBtn.textContent = '✅ În Așteptarea Adversarului...';
+            }
+        }
+    }
+
+    // Reia conexiunea WebRTC P2P direct cu adversarul
+    connectToRoom(session.roomCode, session.role, true);
+}
+
+const PEER_CONFIG = {
+    debug: 1,
+    config: {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+    }
+};
+
+function getHostPeerId(roomCode) {
+    return `av88-${roomCode.trim().toLowerCase()}-host`;
+}
+
+function connectToRoom(code, role, isResuming = false) {
     state.roomCode = code.toUpperCase();
     state.role = role;
+    state.isReconnecting = isResuming;
 
-    // Afișează imediat ecranul de plasare și randează grila 8x8
-    onConnectedToRoom();
+    if (!isResuming) {
+        onConnectedToRoom();
+    }
+    saveMatchSession();
 
-    const hasSupabase = initSupabase(false);
-    if (hasSupabase && state.supabaseClient) {
-        // Închide canalul vechi dacă există
-        if (state.channel) {
-            try {
-                state.supabaseClient.removeChannel(state.channel);
-            } catch (err) {
-                console.warn(err);
-            }
-        }
+    if (state.activeConn) {
+        try { state.activeConn.close(); } catch (e) {}
+        state.activeConn = null;
+    }
+    if (state.peer) {
+        try { state.peer.destroy(); } catch (e) {}
+        state.peer = null;
+    }
 
-        const channelName = `room_${state.roomCode}`;
-        state.channel = state.supabaseClient.channel(channelName, {
-            config: {
-                presence: { key: state.role }
-            }
-        });
+    const hostId = getHostPeerId(state.roomCode);
 
-        // 1. Monitorizare Prezență (Cine e în cameră)
-        state.channel.on('presence', { event: 'sync' }, () => {
-            const presenceState = state.channel.presenceState();
-            const otherRole = state.role === 'host' ? 'guest' : 'host';
-            const otherList = presenceState[otherRole];
-            const hasOpponent = Boolean(otherList && otherList.length > 0);
+    if (role === 'host') {
+        state.peer = new Peer(hostId, PEER_CONFIG);
 
-            state.opponentConnected = hasOpponent;
-            if (hasOpponent && otherList[0] && otherList[0].name) {
-                state.opponentName = otherList[0].name;
-            }
+        state.peer.on('open', (id) => {
+            console.log('Peer Host activat cu ID:', id);
+            hideReconnectBanner();
             updateLobbyOpponentStatus();
-            updatePlayerNamesUI();
+        });
 
-            if (hasOpponent && state.role === 'host' && state.phase === 'SETUP') {
-                // Trimite din nou setările către guest dacă abia a intrat
-                broadcastEvent('GAME_CONFIG', {
-                    variant: state.planeVariant,
-                    count: state.planeCount,
-                    hostName: state.playerName
-                });
+        state.peer.on('connection', (conn) => {
+            console.log('Client nou conectat la Host:', conn.peer);
+            setupConnection(conn);
+        });
+
+        state.peer.on('error', (err) => {
+            console.warn('Eroare Peer Host:', err);
+            if (err.type === 'unavailable-id') {
+                setTimeout(() => {
+                    if (state.role === 'host') {
+                        connectToRoom(code, role, true);
+                    }
+                }, 1200);
+            } else if (err.type === 'disconnected' || err.type === 'network') {
+                showReconnectBanner();
             }
         });
 
-        // 2. Ascultare mesaje Broadcast
-        state.channel.on('broadcast', { event: 'GAME_EVENT' }, ({ payload }) => {
-            handleBroadcastEvent(payload);
-        });
-
-        // Abonare canal
-        state.channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                try {
-                    await state.channel.track({
-                        name: state.playerName,
-                        role: state.role,
-                        onlineAt: new Date().toISOString()
-                    });
-                    broadcastEvent('PLAYER_HELLO', {
-                        playerName: state.playerName,
-                        role: state.role
-                    });
-                } catch (e) {
-                    console.warn(e);
-                }
-            } else if (status === 'CHANNEL_ERROR') {
-                console.warn("Canalul Supabase nu a putut stabili conexiunea Realtime.");
+        state.peer.on('disconnected', () => {
+            showReconnectBanner();
+            if (state.peer && !state.peer.destroyed) {
+                state.peer.reconnect();
             }
         });
+
     } else {
-        console.log("Rulare în mod local / preview (fără conexiune activă Supabase)");
+        const guestId = `av88-${state.roomCode.toLowerCase()}-g-${Date.now().toString(36)}`;
+        state.peer = new Peer(guestId, PEER_CONFIG);
+
+        state.peer.on('open', (id) => {
+            console.log('Peer Guest activat:', id, 'conectare la Host:', hostId);
+            const conn = state.peer.connect(hostId, {
+                reliable: true
+            });
+            setupConnection(conn);
+        });
+
+        state.peer.on('error', (err) => {
+            console.warn('Eroare Peer Guest:', err);
+            if (err.type === 'peer-unavailable') {
+                const oppStatus = document.getElementById('lobby-opponent-status');
+                if (oppStatus) {
+                    oppStatus.innerHTML = `⚠️ <span style="color: var(--neon-crimson)">Camera <b>${state.roomCode}</b> nu a fost găsită sau gazda nu este online!</span>`;
+                }
+            } else if (err.type === 'disconnected' || err.type === 'network') {
+                showReconnectBanner();
+            }
+        });
+
+        state.peer.on('disconnected', () => {
+            showReconnectBanner();
+            if (state.peer && !state.peer.destroyed) {
+                state.peer.reconnect();
+            }
+        });
     }
 }
 
-function broadcastEvent(type, data = {}) {
-    if (!state.channel) return;
-    state.channel.send({
-        type: 'broadcast',
-        event: 'GAME_EVENT',
-        payload: {
-            type,
-            sender: state.role,
-            ...data
+function setupConnection(conn) {
+    state.activeConn = conn;
+
+    const handleOpen = () => {
+        console.log('Conexiune WebRTC P2P Deschisă cu succes!');
+        state.opponentConnected = true;
+        hideReconnectBanner();
+        updateLobbyOpponentStatus();
+        updatePlayerNamesUI();
+
+        if (state.role === 'host') {
+            broadcastEvent('PLAYER_HELLO', {
+                playerName: state.playerName,
+                role: 'host',
+                variant: state.planeVariant,
+                count: state.planeCount
+            });
+
+            if (state.myReady) {
+                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+            }
+
+            // Dacă meciul era în desfășurare, trimite starea completă celuilalt telefon
+            if (state.phase === 'BATTLE') {
+                broadcastEvent('SYNC_BATTLE_STATE', {
+                    currentTurn: state.currentTurn,
+                    hostShotsOnGuest: state.myShotsOnEnemy,
+                    guestShotsOnHost: state.enemyShotsOnMe,
+                    hostStats: state.stats,
+                    planeCount: state.planeCount,
+                    variant: state.planeVariant,
+                    hostName: state.playerName,
+                    guestName: state.opponentName
+                });
+            }
+        } else {
+            broadcastEvent('PLAYER_HELLO', {
+                playerName: state.playerName,
+                role: 'guest'
+            });
+            if (state.myReady) {
+                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+            }
+            if (state.phase === 'BATTLE') {
+                broadcastEvent('REQUEST_BATTLE_SYNC');
+            }
         }
+    };
+
+    if (conn.open) {
+        handleOpen();
+    } else {
+        conn.on('open', handleOpen);
+    }
+
+    conn.on('data', (data) => {
+        handleBroadcastEvent(data);
+    });
+
+    conn.on('close', () => {
+        console.log('Conexiunea WebRTC cu adversarul s-a întrerupt');
+        state.opponentConnected = false;
+        updateLobbyOpponentStatus();
+        if (state.phase === 'BATTLE') {
+            showReconnectBanner();
+        }
+    });
+
+    conn.on('error', (err) => {
+        console.warn('Eroare conexiune P2P:', err);
     });
 }
 
+function broadcastEvent(type, data = {}) {
+    if (!state.activeConn || !state.activeConn.open) {
+        console.warn('WebRTC nu este conectat pentru a trimite:', type);
+        return;
+    }
+    try {
+        state.activeConn.send({
+            type,
+            sender: state.role,
+            ...data
+        });
+    } catch (e) {
+        console.warn("Eroare la trimiterea mesajului P2P:", e);
+    }
+}
+
 function handleBroadcastEvent(payload) {
-    if (payload.sender === state.role) return; // Ignoră propriile mesaje
+    if (!payload || !payload.type) return;
 
     switch (payload.type) {
         case 'PLAYER_HELLO':
             if (payload.playerName) {
                 state.opponentName = payload.playerName;
-                updatePlayerNamesUI();
-                updateLobbyOpponentStatus();
             }
-            if (payload.role !== state.role) {
+            if (payload.variant && payload.count && state.role === 'guest') {
+                state.planeVariant = payload.variant;
+                state.planeCount = payload.count;
+                updateSetupUI();
+            }
+            state.opponentConnected = true;
+            updatePlayerNamesUI();
+            updateLobbyOpponentStatus();
+            saveMatchSession();
+
+            if (payload.role !== state.role && state.role === 'guest') {
                 broadcastEvent('PLAYER_HELLO_ACK', {
                     playerName: state.playerName,
                     role: state.role
+                });
+            }
+            if (state.myReady) {
+                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+            }
+            if (state.role === 'host' && state.phase === 'BATTLE') {
+                broadcastEvent('SYNC_BATTLE_STATE', {
+                    currentTurn: state.currentTurn,
+                    hostShotsOnGuest: state.myShotsOnEnemy,
+                    guestShotsOnHost: state.enemyShotsOnMe,
+                    hostStats: state.stats,
+                    planeCount: state.planeCount,
+                    variant: state.planeVariant,
+                    hostName: state.playerName,
+                    guestName: state.opponentName
                 });
             }
             break;
@@ -295,8 +481,13 @@ function handleBroadcastEvent(payload) {
         case 'PLAYER_HELLO_ACK':
             if (payload.playerName) {
                 state.opponentName = payload.playerName;
-                updatePlayerNamesUI();
-                updateLobbyOpponentStatus();
+            }
+            state.opponentConnected = true;
+            updatePlayerNamesUI();
+            updateLobbyOpponentStatus();
+            saveMatchSession();
+            if (state.myReady) {
+                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
             }
             break;
 
@@ -306,10 +497,11 @@ function handleBroadcastEvent(payload) {
                 state.planeCount = payload.count;
                 if (payload.hostName) {
                     state.opponentName = payload.hostName;
-                    updatePlayerNamesUI();
-                    updateLobbyOpponentStatus();
                 }
+                updatePlayerNamesUI();
+                updateLobbyOpponentStatus();
                 updateSetupUI();
+                saveMatchSession();
             }
             break;
 
@@ -317,14 +509,16 @@ function handleBroadcastEvent(payload) {
             state.opponentReady = true;
             if (payload.playerName) {
                 state.opponentName = payload.playerName;
-                updatePlayerNamesUI();
             }
+            updatePlayerNamesUI();
             updateOpponentReadyIndicator();
+            saveMatchSession();
             checkBothReadyToStart();
             break;
 
         case 'START_BATTLE':
             state.currentTurn = payload.startingTurn || 'host';
+            saveMatchSession();
             startCombatPhase();
             break;
 
@@ -334,6 +528,25 @@ function handleBroadcastEvent(payload) {
 
         case 'SHOT_RESULT':
             handleShotResultReceived(payload);
+            break;
+
+        case 'SYNC_BATTLE_STATE':
+            handleSyncBattleState(payload);
+            break;
+
+        case 'REQUEST_BATTLE_SYNC':
+            if (state.role === 'host' && state.phase === 'BATTLE') {
+                broadcastEvent('SYNC_BATTLE_STATE', {
+                    currentTurn: state.currentTurn,
+                    hostShotsOnGuest: state.myShotsOnEnemy,
+                    guestShotsOnHost: state.enemyShotsOnMe,
+                    hostStats: state.stats,
+                    planeCount: state.planeCount,
+                    variant: state.planeVariant,
+                    hostName: state.playerName,
+                    guestName: state.opponentName
+                });
+            }
             break;
 
         case 'REMATCH_OFFER':
@@ -346,15 +559,48 @@ function handleBroadcastEvent(payload) {
     }
 }
 
+function handleSyncBattleState(payload) {
+    if (!payload) return;
+    if (state.role === 'guest') {
+        state.currentTurn = payload.currentTurn;
+        if (payload.hostShotsOnGuest) state.enemyShotsOnMe = payload.hostShotsOnGuest;
+        if (payload.guestShotsOnHost) state.myShotsOnEnemy = payload.guestShotsOnHost;
+        if (payload.hostName) state.opponentName = payload.hostName;
+    } else {
+        state.currentTurn = payload.currentTurn;
+    }
+    hideReconnectBanner();
+    renderAttackGrid();
+    renderDefenseGrid();
+    updateCombatStatusUI();
+    saveMatchSession();
+}
+
+function showReconnectBanner() {
+    const banner = document.getElementById('reconnect-banner');
+    if (banner && state.phase === 'BATTLE') {
+        banner.classList.remove('hidden');
+    }
+}
+
+function hideReconnectBanner() {
+    const banner = document.getElementById('reconnect-banner');
+    if (banner) {
+        banner.classList.add('hidden');
+    }
+}
+
 // ==========================================
 // 3. LOGICA DE REȚEA ȘI COMBAT
 // ==========================================
 
 function onConnectedToRoom() {
+    state.phase = 'SETUP';
     showScreen('setup-screen');
     renderSetupGrid();
     updatePlayerNamesUI();
     updateSetupUI();
+    saveMatchSession();
 
     if (state.role === 'host') {
         broadcastEvent('GAME_CONFIG', {
@@ -464,6 +710,7 @@ function handleIncomingShot(cellIndex) {
         state.currentTurn = state.role;
         updateCombatStatusUI();
     }
+    saveMatchSession();
 }
 
 /**
@@ -512,6 +759,7 @@ function handleShotResultReceived(payload) {
         state.currentTurn = otherRole;
         updateCombatStatusUI();
     }
+    saveMatchSession();
 }
 
 // ==========================================
@@ -544,6 +792,7 @@ function randomizeFleet() {
     soundFX.playRadarPing();
     renderSetupGrid();
     updateSetupUI();
+    saveMatchSession();
 }
 
 // ==========================================
@@ -690,6 +939,7 @@ function handleSetupCellClick(r, c) {
             state.myPlanes.splice(i, 1);
             renderSetupGrid();
             updateSetupUI();
+            saveMatchSession();
             return;
         }
     }
@@ -718,6 +968,7 @@ function handleSetupCellClick(r, c) {
 
     renderSetupGrid();
     updateSetupUI();
+    saveMatchSession();
 }
 
 function startCombatPhase() {
@@ -726,6 +977,7 @@ function startCombatPhase() {
     renderAttackGrid();
     renderDefenseGrid();
     updateCombatStatusUI();
+    saveMatchSession();
 }
 
 function renderAttackGrid() {
@@ -825,6 +1077,7 @@ function fireAtEnemy(cellIndex) {
     state.myShotsOnEnemy[cellIndex] = { status: 'PENDING' };
     renderAttackGrid();
     updateCombatStatusUI();
+    saveMatchSession();
 
     // Transmite focul către inamic
     broadcastEvent('FIRE_SHOT', { cellIndex });
@@ -855,6 +1108,7 @@ function updateCombatStatusUI() {
 
 function endGame(won) {
     state.phase = 'GAMEOVER';
+    clearMatchSession();
     showScreen('gameover-modal');
 
     const titleEl = document.getElementById('gameover-title');
@@ -1025,32 +1279,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Pre-completare chei Supabase din localStorage sau config.js
-    const creds = getSupabaseCredentials();
-    if (creds.url) document.getElementById('input-supabase-url').value = creds.url;
-    if (creds.key) document.getElementById('input-supabase-key').value = creds.key;
-
-    // 4. Salvare setări Supabase
-    document.getElementById('btn-save-supabase').addEventListener('click', () => {
-        const url = document.getElementById('input-supabase-url').value.trim();
-        const key = document.getElementById('input-supabase-key').value.trim();
-        if (!url || !key) {
-            alert('Te rog introdu atât URL-ul cât și Anon Key!');
-            return;
+    // 3. Verificare meci în desfășurare (Persistență sesiune dacă nu s-a terminat jocul)
+    const activeSession = getActiveSession();
+    const resumeBanner = document.getElementById('resume-session-banner');
+    if (activeSession && (activeSession.phase === 'BATTLE' || activeSession.phase === 'SETUP')) {
+        if (resumeBanner) {
+            const resumeRoomEl = document.getElementById('resume-room-code');
+            const resumeRoleEl = document.getElementById('resume-role-text');
+            if (resumeRoomEl) resumeRoomEl.textContent = activeSession.roomCode;
+            if (resumeRoleEl) resumeRoleEl.textContent = activeSession.role === 'host' ? 'Gazdă' : 'Oaspete';
+            resumeBanner.classList.remove('hidden');
         }
-        localStorage.setItem('supabase_url', url);
-        localStorage.setItem('supabase_anon_key', key);
-        alert('Setările Supabase au fost salvate cu succes!');
-        showScreen('menu-screen');
-    });
+    }
 
-    document.getElementById('btn-open-supabase-settings').addEventListener('click', () => {
-        showScreen('supabase-config-modal');
-    });
+    const btnResume = document.getElementById('btn-resume-game');
+    if (btnResume) {
+        btnResume.addEventListener('click', () => {
+            soundFX.playClick();
+            if (resumeBanner) resumeBanner.classList.add('hidden');
+            const session = getActiveSession();
+            if (session) {
+                resumeMatch(session);
+            }
+        });
+    }
 
-    document.getElementById('btn-close-supabase-modal').addEventListener('click', () => {
-        showScreen('menu-screen');
-    });
+    const btnDiscard = document.getElementById('btn-discard-session');
+    if (btnDiscard) {
+        btnDiscard.addEventListener('click', () => {
+            soundFX.playClick();
+            clearMatchSession();
+            if (resumeBanner) resumeBanner.classList.add('hidden');
+        });
+    }
 
     // 5. Creare Cameră (Host)
     document.getElementById('btn-create-room').addEventListener('click', () => {
@@ -1158,6 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.myPlanes = [];
         renderSetupGrid();
         updateSetupUI();
+        saveMatchSession();
     });
 
     // 11. Buton Gata de Luptă (Ready)
@@ -1167,6 +1429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-ready-fleet').disabled = true;
         document.getElementById('btn-ready-fleet').textContent = '✅ În Așteptarea Adversarului...';
         broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+        saveMatchSession();
         checkBothReadyToStart();
     });
 
@@ -1198,6 +1461,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-exit-to-menu').addEventListener('click', () => {
+        clearMatchSession();
         window.location.href = window.location.pathname;
     });
 
@@ -1211,5 +1475,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (soundFX.muted) {
             soundBtn.textContent = '🔇';
         }
+    }
+});
+
+// Salvare stare la închiderea paginii și eliberare conexiune PeerJS
+window.addEventListener('beforeunload', () => {
+    saveMatchSession();
+    if (state.activeConn) {
+        try { state.activeConn.close(); } catch (e) {}
+    }
+    if (state.peer) {
+        try { state.peer.destroy(); } catch (e) {}
     }
 });
