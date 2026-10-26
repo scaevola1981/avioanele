@@ -1393,14 +1393,31 @@ function inviteSpecificPilot(pilotName) {
     shareRoomInvite(pilotName);
 }
 
+function getPublicShareUrl(roomCode) {
+    const code = roomCode || state.roomCode || (document.getElementById('display-room-code') ? document.getElementById('display-room-code').textContent.trim() : '') || '';
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '' || window.location.protocol === 'file:';
+    
+    // Dacă jocul rulează pe calculatorul local (localhost / 127.0.0.1), link-ul trimis pe telefon trebuie să fie cel public de pe GitHub Pages!
+    // Altfel, pe telefon "localhost" se referă la telefonul însuși și dă "ERR_CONNECTION_REFUSED".
+    if (isLocal) {
+        return `https://scaevola1981.github.io/avioanele/?room=${encodeURIComponent(code)}`;
+    }
+    
+    const origin = window.location.origin;
+    let pathname = window.location.pathname || '/';
+    if (!pathname.endsWith('/')) {
+        pathname += '/';
+    }
+    return `${origin}${pathname}?room=${encodeURIComponent(code)}`;
+}
+
 function shareRoomInvite(pilotName) {
-    const roomCode = state.roomCode || document.getElementById('display-room-code').textContent || '';
-    const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://scaevola1981.github.io';
-    const pathname = window.location.pathname || '/avioanele/';
-    const shareUrl = `${origin}${pathname}?room=${roomCode}`;
+    const roomCode = state.roomCode || (document.getElementById('display-room-code') ? document.getElementById('display-room-code').textContent.trim() : '') || '';
+    const shareUrl = getPublicShareUrl(roomCode);
     const targetGreeting = pilotName ? `Salut ${pilotName}!` : 'Salut!';
     const shareTitle = '⚔️ Jocul de Avioane 8x8 - Luptă cu mine!';
-    const shareText = `${targetGreeting} Te provoc la o luptă în Jocul de Avioane 8x8! Intră aici sau folosește codul ${roomCode}:\n${shareUrl}`;
+    const shareText = `${targetGreeting} Te provoc la o luptă în Jocul de Avioane 8x8! Deschide jocul aici sau folosește codul ${roomCode}:\n${shareUrl}`;
 
     if (navigator.share) {
         navigator.share({
@@ -1729,7 +1746,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. Copiere link cameră
     document.getElementById('btn-copy-room-link').addEventListener('click', () => {
         soundFX.playRadarPing();
-        const link = `${window.location.origin}${window.location.pathname}?room=${state.roomCode}`;
+        const link = getPublicShareUrl(state.roomCode);
         navigator.clipboard.writeText(link).then(() => {
             const btn = document.getElementById('btn-copy-room-link');
             const originalText = btn.textContent;
