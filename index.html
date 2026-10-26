@@ -12,12 +12,12 @@
     <meta name="mobile-web-app-capable" content="yes">
 
     <!-- Iconițe Aplicație & Manifest PWA -->
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="public/favicon.png">
+    <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=14) -->
-    <link rel="stylesheet" href="styles.css?v=14">
+    <!-- Design & Fonturi (cu cache-busting v=15) -->
+    <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
 
@@ -427,16 +427,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=14) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=15) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=14"></script>
-    <script src="game.js?v=14"></script>
+    <script src="sound.js?v=15"></script>
+    <script src="game.js?v=15"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=14')
+                navigator.serviceWorker.register('./sw.js?v=15')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });

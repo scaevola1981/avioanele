@@ -1,16 +1,17 @@
 // Service Worker pentru Jocul de Avioane 8x8 (PWA)
-const CACHE_NAME = 'avioane-v14';
+const CACHE_NAME = 'avioane-v15';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=14',
-  './game.js?v=14',
-  './sound.js?v=14',
+  './styles.css?v=15',
+  './game.js?v=15',
+  './sound.js?v=15',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './apple-touch-icon.png',
-  './favicon.png'
+  './public/icon-192.png',
+  './public/icon-512.png',
+  './public/apple-touch-icon.png',
+  './public/favicon.png',
+  './public/icon.png'
 ];
 
 self.addEventListener('install', (event) => {

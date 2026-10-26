@@ -51,7 +51,11 @@ Un remake modern al clasicului joc din copilărie „Avioanele”, reproiectat p
 ├── sound.js         # Generator audio procedural Web Audio API (zero dependențe)
 ├── sw.js            # Service Worker pentru suport PWA și funcționare offline
 ├── manifest.json    # Manifestul PWA pentru instalare pe ecranul telefonului
-├── icon-192.png     # Iconiță PWA 192x192
-├── icon-512.png     # Iconiță PWA 512x512
-└── README.md        # Documentația proiectului
+├── README.md        # Documentația proiectului
+└── public/          # Directorul pentru toate imaginile și activele media (PNG)
+    ├── icon-192.png
+    ├── icon-512.png
+    ├── icon.png
+    ├── apple-touch-icon.png
+    └── favicon.png
 ```
