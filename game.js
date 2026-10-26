@@ -257,10 +257,48 @@ const PEER_CONFIG = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:openrelay.metered.ca:80' },
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            }
         ]
     }
 };
+
+let keepAliveTimer = null;
+let guestConnectTimer = null;
+let guestConnectAttempts = 0;
+
+function startKeepAliveHeartbeat() {
+    if (keepAliveTimer) clearInterval(keepAliveTimer);
+    keepAliveTimer = setInterval(() => {
+        if (state.activeConn && state.activeConn.open) {
+            try {
+                state.activeConn.send({ type: 'PING' });
+            } catch (e) {}
+        }
+    }, 3500);
+}
+
+function stopKeepAliveHeartbeat() {
+    if (keepAliveTimer) {
+        clearInterval(keepAliveTimer);
+        keepAliveTimer = null;
+    }
+}
 
 function getHostPeerId(roomCode) {
     return `av88-${roomCode.trim().toLowerCase()}-host`;
@@ -270,6 +308,14 @@ function connectToRoom(code, role, isResuming = false) {
     state.roomCode = code.toUpperCase();
     state.role = role;
     state.isReconnecting = isResuming;
+    state.opponentConnected = false;
+
+    if (guestConnectTimer) {
+        clearInterval(guestConnectTimer);
+        guestConnectTimer = null;
+    }
+    guestConnectAttempts = 0;
+    stopKeepAliveHeartbeat();
 
     if (!isResuming) {
         onConnectedToRoom();
@@ -294,6 +340,7 @@ function connectToRoom(code, role, isResuming = false) {
             console.log('Peer Host activat cu ID:', id);
             hideReconnectBanner();
             updateLobbyOpponentStatus();
+            updateSetupUI();
         });
 
         state.peer.on('connection', (conn) => {
@@ -308,7 +355,7 @@ function connectToRoom(code, role, isResuming = false) {
                     if (state.role === 'host') {
                         connectToRoom(code, role, true);
                     }
-                }, 1200);
+                }, 1500);
             } else if (err.type === 'disconnected' || err.type === 'network') {
                 showReconnectBanner();
             }
@@ -325,21 +372,40 @@ function connectToRoom(code, role, isResuming = false) {
         const guestId = `av88-${state.roomCode.toLowerCase()}-g-${Date.now().toString(36)}`;
         state.peer = new Peer(guestId, PEER_CONFIG);
 
-        state.peer.on('open', (id) => {
-            console.log('Peer Guest activat:', id, 'conectare la Host:', hostId);
+        const attemptGuestConnect = () => {
+            if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
+                if (guestConnectTimer) clearInterval(guestConnectTimer);
+                return;
+            }
+            guestConnectAttempts++;
+            console.log(`[P2P] Guest conectare la Host: ${hostId} (încercarea #${guestConnectAttempts})`);
             const conn = state.peer.connect(hostId, {
                 reliable: true
             });
             setupConnection(conn);
+        };
+
+        state.peer.on('open', (id) => {
+            console.log('Peer Guest activat:', id, 'conectare la Host:', hostId);
+            attemptGuestConnect();
+            if (guestConnectTimer) clearInterval(guestConnectTimer);
+            guestConnectTimer = setInterval(() => {
+                if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
+                    clearInterval(guestConnectTimer);
+                    return;
+                }
+                if (guestConnectAttempts < 12) {
+                    attemptGuestConnect();
+                } else {
+                    clearInterval(guestConnectTimer);
+                }
+            }, 2500);
         });
 
         state.peer.on('error', (err) => {
             console.warn('Eroare Peer Guest:', err);
             if (err.type === 'peer-unavailable') {
-                const oppStatus = document.getElementById('lobby-opponent-status');
-                if (oppStatus) {
-                    oppStatus.innerHTML = `⚠️ <span style="color: var(--neon-crimson)">Camera <b>${state.roomCode}</b> nu a fost găsită sau gazda nu este online!</span>`;
-                }
+                console.log('Gazda nu este încă online pe PeerJS, se reîncearcă automat...');
             } else if (err.type === 'disconnected' || err.type === 'network') {
                 showReconnectBanner();
             }
@@ -360,46 +426,40 @@ function setupConnection(conn) {
     const handleOpen = () => {
         console.log('Conexiune WebRTC P2P Deschisă cu succes!');
         state.opponentConnected = true;
+        if (guestConnectTimer) {
+            clearInterval(guestConnectTimer);
+            guestConnectTimer = null;
+        }
         hideReconnectBanner();
-        updateLobbyOpponentStatus();
+        startKeepAliveHeartbeat();
         updatePlayerNamesUI();
+        updateLobbyOpponentStatus();
+        updateSetupUI();
+        saveMatchSession();
 
-        if (state.role === 'host') {
-            broadcastEvent('PLAYER_HELLO', {
-                playerName: state.playerName,
-                role: 'host',
+        // Trimite identitatea și starea curentă
+        broadcastEvent('PLAYER_HELLO', {
+            playerName: state.playerName,
+            role: state.role,
+            variant: state.planeVariant,
+            count: state.planeCount
+        });
+
+        if (state.myReady) {
+            broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+        }
+
+        if (state.role === 'host' && state.phase === 'BATTLE') {
+            broadcastEvent('SYNC_BATTLE_STATE', {
+                currentTurn: state.currentTurn,
+                hostShotsOnGuest: state.myShotsOnEnemy,
+                guestShotsOnHost: state.enemyShotsOnMe,
+                hostStats: state.stats,
+                planeCount: state.planeCount,
                 variant: state.planeVariant,
-                count: state.planeCount
+                hostName: state.playerName,
+                guestName: state.opponentName
             });
-
-            if (state.myReady) {
-                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
-            }
-
-            // Dacă meciul era în desfășurare, trimite starea completă celuilalt telefon
-            if (state.phase === 'BATTLE') {
-                broadcastEvent('SYNC_BATTLE_STATE', {
-                    currentTurn: state.currentTurn,
-                    hostShotsOnGuest: state.myShotsOnEnemy,
-                    guestShotsOnHost: state.enemyShotsOnMe,
-                    hostStats: state.stats,
-                    planeCount: state.planeCount,
-                    variant: state.planeVariant,
-                    hostName: state.playerName,
-                    guestName: state.opponentName
-                });
-            }
-        } else {
-            broadcastEvent('PLAYER_HELLO', {
-                playerName: state.playerName,
-                role: 'guest'
-            });
-            if (state.myReady) {
-                broadcastEvent('PLAYER_READY', { playerName: state.playerName });
-            }
-            if (state.phase === 'BATTLE') {
-                broadcastEvent('REQUEST_BATTLE_SYNC');
-            }
         }
     };
 
@@ -416,7 +476,9 @@ function setupConnection(conn) {
     conn.on('close', () => {
         console.log('Conexiunea WebRTC cu adversarul s-a întrerupt');
         state.opponentConnected = false;
+        stopKeepAliveHeartbeat();
         updateLobbyOpponentStatus();
+        updateSetupUI();
         if (state.phase === 'BATTLE') {
             showReconnectBanner();
         }
@@ -447,6 +509,16 @@ function handleBroadcastEvent(payload) {
     if (!payload || !payload.type) return;
 
     switch (payload.type) {
+        case 'PING':
+            if (state.activeConn && state.activeConn.open) {
+                try { state.activeConn.send({ type: 'PONG' }); } catch (e) {}
+            }
+            break;
+
+        case 'PONG':
+            // Keep-alive confirmat
+            break;
+
         case 'PLAYER_HELLO':
             if (payload.playerName) {
                 state.opponentName = payload.playerName;
@@ -455,33 +527,23 @@ function handleBroadcastEvent(payload) {
             if (payload.variant && payload.count && state.role === 'guest') {
                 state.planeVariant = payload.variant;
                 state.planeCount = payload.count;
-                updateSetupUI();
             }
             state.opponentConnected = true;
             updatePlayerNamesUI();
             updateLobbyOpponentStatus();
+            updateSetupUI();
             saveMatchSession();
 
-            if (payload.role !== state.role && state.role === 'guest') {
-                broadcastEvent('PLAYER_HELLO_ACK', {
-                    playerName: state.playerName,
-                    role: state.role
-                });
-            }
+            // Răspunde întotdeauna cu ACK pentru confirmare bilaterală
+            broadcastEvent('PLAYER_HELLO_ACK', {
+                playerName: state.playerName,
+                role: state.role,
+                variant: state.planeVariant,
+                count: state.planeCount
+            });
+
             if (state.myReady) {
                 broadcastEvent('PLAYER_READY', { playerName: state.playerName });
-            }
-            if (state.role === 'host' && state.phase === 'BATTLE') {
-                broadcastEvent('SYNC_BATTLE_STATE', {
-                    currentTurn: state.currentTurn,
-                    hostShotsOnGuest: state.myShotsOnEnemy,
-                    guestShotsOnHost: state.enemyShotsOnMe,
-                    hostStats: state.stats,
-                    planeCount: state.planeCount,
-                    variant: state.planeVariant,
-                    hostName: state.playerName,
-                    guestName: state.opponentName
-                });
             }
             break;
 
@@ -490,9 +552,14 @@ function handleBroadcastEvent(payload) {
                 state.opponentName = payload.playerName;
                 recordRecentOpponent(payload.playerName);
             }
+            if (payload.variant && payload.count && state.role === 'guest') {
+                state.planeVariant = payload.variant;
+                state.planeCount = payload.count;
+            }
             state.opponentConnected = true;
             updatePlayerNamesUI();
             updateLobbyOpponentStatus();
+            updateSetupUI();
             saveMatchSession();
             if (state.myReady) {
                 broadcastEvent('PLAYER_READY', { playerName: state.playerName });
@@ -818,11 +885,21 @@ function updatePlayerNamesUI() {
 
     const mySetupDisplay = document.getElementById('setup-my-name-display');
     const oppSetupDisplay = document.getElementById('setup-opp-name-display');
-    const combatOpp = document.getElementById('combat-opp-name');
-    const combatMy = document.getElementById('combat-my-name');
+    const myRoleBadge = document.getElementById('setup-my-role-badge');
+    const oppRoleBadge = document.getElementById('setup-opp-role-badge');
 
     if (mySetupDisplay) mySetupDisplay.textContent = myName;
     if (oppSetupDisplay) oppSetupDisplay.textContent = oppName;
+
+    if (myRoleBadge) {
+        myRoleBadge.textContent = state.role === 'host' ? 'TU (GAZDĂ)' : 'TU (OASPETE)';
+    }
+    if (oppRoleBadge) {
+        oppRoleBadge.textContent = state.role === 'host' ? 'OASPETE' : 'GAZDĂ';
+    }
+
+    const combatOpp = document.getElementById('combat-opp-name');
+    const combatMy = document.getElementById('combat-my-name');
     if (combatOpp) combatOpp.textContent = (state.opponentName || 'INAMIC').toUpperCase();
     if (combatMy) combatMy.textContent = myName.toUpperCase();
 }
@@ -835,13 +912,46 @@ function updateSetupUI() {
     const countEl = document.getElementById('setup-rule-count');
     if (countEl) countEl.textContent = `${state.myPlanes.length} / ${state.planeCount}`;
 
+    // Actualizare rol în interfață (Gazdă vs Oaspete)
+    const roomRoleTag = document.getElementById('room-role-tag');
+    const hostActions = document.getElementById('host-actions-container');
+    const guestBadge = document.getElementById('guest-badge-container');
+    const guestStatusBadge = document.getElementById('guest-status-badge');
+    const recentInviteBox = document.getElementById('setup-recent-invite-box');
+
+    if (state.role === 'host') {
+        if (roomRoleTag) roomRoleTag.textContent = '👑 GAZDA CAMEREI';
+        if (hostActions) hostActions.classList.remove('hidden');
+        if (guestBadge) guestBadge.classList.add('hidden');
+        if (recentInviteBox && state.recentOpponents && state.recentOpponents.length > 0) {
+            recentInviteBox.classList.remove('hidden');
+        }
+    } else {
+        if (roomRoleTag) roomRoleTag.textContent = '🎯 OASPETE (MISIUNE)';
+        if (hostActions) hostActions.classList.add('hidden');
+        if (guestBadge) {
+            guestBadge.classList.remove('hidden');
+            const opp = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Gazdă';
+            if (guestStatusBadge) {
+                guestStatusBadge.textContent = state.opponentConnected ? `🛡️ Conectat la ${opp}` : '⏳ Se conectează...';
+            }
+        }
+        if (recentInviteBox) recentInviteBox.classList.add('hidden');
+    }
+
     const readyBtn = document.getElementById('btn-ready-fleet');
     if (readyBtn) {
-        if (state.myPlanes.length === state.planeCount) {
+        if (state.myReady) {
+            readyBtn.disabled = true;
+            readyBtn.textContent = '✅ În Așteptarea Adversarului...';
+            readyBtn.classList.remove('pulse-ready');
+        } else if (state.myPlanes.length === state.planeCount) {
             readyBtn.disabled = false;
+            readyBtn.textContent = 'GATA DE LUPTĂ';
             readyBtn.classList.add('pulse-ready');
         } else {
             readyBtn.disabled = true;
+            readyBtn.textContent = 'GATA DE LUPTĂ';
             readyBtn.classList.remove('pulse-ready');
         }
     }
@@ -892,12 +1002,22 @@ function updateLobbyOpponentStatus() {
     const oppStatus = document.getElementById('lobby-opponent-status');
     if (!oppStatus) return;
 
-    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' 
+        ? state.opponentName 
+        : (state.role === 'host' ? 'Oaspetele' : 'Gazda');
 
     if (state.opponentConnected) {
-        oppStatus.innerHTML = `🟢 <span style="color: var(--neon-cyan)"><b>${oppName}</b> s-a conectat!</span> ${state.opponentReady ? '<b>(Gata de Luptă! ✈️)</b>' : '(Își plasează avioanele...)'}`;
+        if (state.role === 'host') {
+            oppStatus.innerHTML = `🟢 <span style="color: var(--neon-cyan)"><b>${oppName}</b> s-a alăturat jocului!</span> ${state.opponentReady ? '<b>(Gata de Luptă! ✈️)</b>' : '(Își plasează avioanele...)'}`;
+        } else {
+            oppStatus.innerHTML = `🟢 <span style="color: var(--neon-cyan)">Conectat cu Gazda <b>${oppName}</b>!</span> ${state.opponentReady ? '<b>(Gazda este Gata! ✈️)</b>' : '(Gazda își așază avioanele...)'}`;
+        }
     } else {
-        oppStatus.innerHTML = `🟡 <span style="color: var(--neon-amber)">În așteptarea adversarului... Trimite invitația!</span>`;
+        if (state.role === 'host') {
+            oppStatus.innerHTML = `🟡 <span style="color: var(--neon-amber)">În așteptarea oaspetelui... Apasă <b>INVITĂ</b> sau trimite codul <b>${state.roomCode}</b>!</span>`;
+        } else {
+            oppStatus.innerHTML = `🟡 <span style="color: var(--neon-amber)">Se conectează la Gazda camerei <b>${state.roomCode}</b>...</span>`;
+        }
     }
 }
 
@@ -1447,15 +1567,7 @@ function initPilotSignaling(pilotName) {
     }
 
     try {
-        state.pilotPeer = new Peer(pilotPeerId, {
-            debug: 1,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ]
-            }
-        });
+        state.pilotPeer = new Peer(pilotPeerId, PEER_CONFIG);
 
         state.pilotPeer.on('open', (id) => {
             console.log('📡 Pilot P2P Beacon activat pentru:', id);
@@ -1668,7 +1780,8 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('pilot_name', finalName);
             initPilotSignaling(finalName);
 
-            const roomCode = document.getElementById('input-join-room-code').value.trim().toUpperCase();
+            const inviteDisplay = document.getElementById('invite-room-display');
+            const roomCode = (inviteDisplay && inviteDisplay.textContent.trim() !== '----' ? inviteDisplay.textContent.trim() : '') || document.getElementById('input-join-room-code').value.trim().toUpperCase();
             document.getElementById('display-room-code').textContent = roomCode;
 
             // Închide modalul
@@ -1786,8 +1899,20 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Te rog introdu un cod valid de cameră!');
             return;
         }
-        document.getElementById('display-room-code').textContent = codeInput;
-        connectToRoom(codeInput, 'guest');
+
+        // Deschide modalul de confirmare / invitație la joc ca Oaspete
+        const inviteModal = document.getElementById('invite-welcome-modal');
+        const inviteRoomDisplay = document.getElementById('invite-room-display');
+        const guestInput = document.getElementById('input-modal-guest-name');
+        if (inviteRoomDisplay) inviteRoomDisplay.textContent = codeInput;
+        if (guestInput) guestInput.value = finalName;
+
+        if (inviteModal) {
+            inviteModal.classList.remove('hidden');
+        } else {
+            document.getElementById('display-room-code').textContent = codeInput;
+            connectToRoom(codeInput, 'guest');
+        }
     });
 
     // 7. Copiere link cameră

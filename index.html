@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=11) -->
-    <link rel="stylesheet" href="styles.css?v=11">
+    <!-- Design & Fonturi (cu cache-busting v=12) -->
+    <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 
@@ -128,28 +128,31 @@
     <section id="setup-screen" class="app-screen hidden">
         <div class="setup-container">
             
-            <!-- Confruntare Piloți (Nume Jucători) -->
+            <!-- Confruntare Piloți (Nume Jucători & Roluri) -->
             <div class="players-versus-card">
                 <div class="player-tag tag-me">
-                    <span class="player-role-badge">TU</span>
+                    <span id="setup-my-role-badge" class="player-role-badge">TU (GAZDĂ)</span>
                     <strong id="setup-my-name-display">Comandant</strong>
                 </div>
                 <div class="versus-badge">VS</div>
                 <div class="player-tag tag-opp">
-                    <span class="player-role-badge">ADVERSAR</span>
+                    <span id="setup-opp-role-badge" class="player-role-badge">ADVERSAR</span>
                     <strong id="setup-opp-name-display">Se așteaptă...</strong>
                 </div>
             </div>
 
-            <!-- Badge Cameră & Buton Invită -->
+            <!-- Badge Cameră & Buton Invită (Doar Gazda are butoane de Invitare/Copiere) -->
             <div class="room-badge-card">
                 <div>
-                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Cod Cameră</div>
+                    <div id="room-role-tag" style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">👑 GAZDA CAMEREI</div>
                     <span id="display-room-code" class="room-code-tag">----</span>
                 </div>
-                <div style="display: flex; gap: 8px;">
+                <div id="host-actions-container" style="display: flex; gap: 8px;">
                     <button id="btn-invite-opponent" class="btn-primary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 14px;">📤 INVITĂ</button>
                     <button id="btn-copy-room-link" class="btn-secondary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 12px;">🔗 Copiază</button>
+                </div>
+                <div id="guest-badge-container" class="hidden" style="display: flex; align-items: center;">
+                    <span id="guest-status-badge" style="background: rgba(0, 245, 212, 0.12); border: 1.5px solid var(--neon-cyan); color: var(--neon-cyan); padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; text-shadow: var(--neon-cyan-glow);">🛡️ Oaspete Conectat</span>
                 </div>
             </div>
 
@@ -322,9 +325,9 @@
                 </div>
             </div>
 
-            <!-- 1. BUTONUL JOACĂ -->
+            <!-- 1. BUTONUL ACCEPTĂ ȘI JOACĂ -->
             <button id="btn-modal-join-play" class="btn-primary" style="margin-bottom: 8px;">
-                ▶️ JOACĂ
+                ⚔️ ACCEPTĂ ȘI JOACĂ
             </button>
 
             <!-- 2. BUTONUL DESCARCĂ APLICAȚIA -->
@@ -424,16 +427,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=11) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=12) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=11"></script>
-    <script src="game.js?v=11"></script>
+    <script src="sound.js?v=12"></script>
+    <script src="game.js?v=12"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=11')
+                navigator.serviceWorker.register('./sw.js?v=12')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });
