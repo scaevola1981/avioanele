@@ -16,12 +16,20 @@ function getCoordinateLabel(cellIndex) {
     return `${ROW_LETTERS[r]}${COL_NUMBERS[c]}`;
 }
 
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+});
+
 // Starea globală a jocului
 const state = {
     supabaseClient: null,
     channel: null,
     roomCode: '',
     role: null, // 'host' | 'guest'
+    playerName: localStorage.getItem('pilot_name') || 'Comandant',
+    opponentName: 'Adversar',
     opponentConnected: false,
     opponentReady: false,
     myReady: false,
@@ -203,16 +211,22 @@ function connectToRoom(code, role) {
         state.channel.on('presence', { event: 'sync' }, () => {
             const presenceState = state.channel.presenceState();
             const otherRole = state.role === 'host' ? 'guest' : 'host';
-            const hasOpponent = Boolean(presenceState[otherRole]);
+            const otherList = presenceState[otherRole];
+            const hasOpponent = Boolean(otherList && otherList.length > 0);
 
             state.opponentConnected = hasOpponent;
+            if (hasOpponent && otherList[0] && otherList[0].name) {
+                state.opponentName = otherList[0].name;
+            }
             updateLobbyOpponentStatus();
+            updatePlayerNamesUI();
 
             if (hasOpponent && state.role === 'host' && state.phase === 'SETUP') {
                 // Trimite din nou setările către guest dacă abia a intrat
                 broadcastEvent('GAME_CONFIG', {
                     variant: state.planeVariant,
-                    count: state.planeCount
+                    count: state.planeCount,
+                    hostName: state.playerName
                 });
             }
         });
@@ -226,7 +240,15 @@ function connectToRoom(code, role) {
         state.channel.subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
                 try {
-                    await state.channel.track({ onlineAt: new Date().toISOString() });
+                    await state.channel.track({
+                        name: state.playerName,
+                        role: state.role,
+                        onlineAt: new Date().toISOString()
+                    });
+                    broadcastEvent('PLAYER_HELLO', {
+                        playerName: state.playerName,
+                        role: state.role
+                    });
                 } catch (e) {
                     console.warn(e);
                 }
@@ -256,16 +278,47 @@ function handleBroadcastEvent(payload) {
     if (payload.sender === state.role) return; // Ignoră propriile mesaje
 
     switch (payload.type) {
+        case 'PLAYER_HELLO':
+            if (payload.playerName) {
+                state.opponentName = payload.playerName;
+                updatePlayerNamesUI();
+                updateLobbyOpponentStatus();
+            }
+            if (payload.role !== state.role) {
+                broadcastEvent('PLAYER_HELLO_ACK', {
+                    playerName: state.playerName,
+                    role: state.role
+                });
+            }
+            break;
+
+        case 'PLAYER_HELLO_ACK':
+            if (payload.playerName) {
+                state.opponentName = payload.playerName;
+                updatePlayerNamesUI();
+                updateLobbyOpponentStatus();
+            }
+            break;
+
         case 'GAME_CONFIG':
             if (state.role === 'guest') {
                 state.planeVariant = payload.variant;
                 state.planeCount = payload.count;
+                if (payload.hostName) {
+                    state.opponentName = payload.hostName;
+                    updatePlayerNamesUI();
+                    updateLobbyOpponentStatus();
+                }
                 updateSetupUI();
             }
             break;
 
         case 'PLAYER_READY':
             state.opponentReady = true;
+            if (payload.playerName) {
+                state.opponentName = payload.playerName;
+                updatePlayerNamesUI();
+            }
             updateOpponentReadyIndicator();
             checkBothReadyToStart();
             break;
@@ -300,12 +353,14 @@ function handleBroadcastEvent(payload) {
 function onConnectedToRoom() {
     showScreen('setup-screen');
     renderSetupGrid();
+    updatePlayerNamesUI();
     updateSetupUI();
 
     if (state.role === 'host') {
         broadcastEvent('GAME_CONFIG', {
             variant: state.planeVariant,
-            count: state.planeCount
+            count: state.planeCount,
+            hostName: state.playerName
         });
     }
 }
@@ -505,6 +560,21 @@ function showScreen(screenId) {
     }
 }
 
+function updatePlayerNamesUI() {
+    const myName = state.playerName || (state.role === 'host' ? 'Comandant' : 'Pilot');
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Se așteaptă...';
+
+    const mySetupDisplay = document.getElementById('setup-my-name-display');
+    const oppSetupDisplay = document.getElementById('setup-opp-name-display');
+    const combatOpp = document.getElementById('combat-opp-name');
+    const combatMy = document.getElementById('combat-my-name');
+
+    if (mySetupDisplay) mySetupDisplay.textContent = myName;
+    if (oppSetupDisplay) oppSetupDisplay.textContent = oppName;
+    if (combatOpp) combatOpp.textContent = (state.opponentName || 'INAMIC').toUpperCase();
+    if (combatMy) combatMy.textContent = myName.toUpperCase();
+}
+
 function updateSetupUI() {
     const variantName = state.planeVariant === 1 ? 'Compact (8 căsuțe)' : 'Clasic (10 căsuțe)';
     document.getElementById('setup-rule-variant').textContent = variantName;
@@ -519,6 +589,7 @@ function updateSetupUI() {
         readyBtn.classList.remove('pulse-ready');
     }
 
+    updatePlayerNamesUI();
     updateLobbyOpponentStatus();
 }
 
@@ -526,14 +597,17 @@ function updateLobbyOpponentStatus() {
     const oppStatus = document.getElementById('lobby-opponent-status');
     if (!oppStatus) return;
 
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+
     if (state.opponentConnected) {
-        oppStatus.innerHTML = `🟢 <span style="color: var(--neon-cyan)">Adversar Conectat</span> ${state.opponentReady ? '(Gata de Luptă!)' : '(Își plasează avioanele)'}`;
+        oppStatus.innerHTML = `🟢 <span style="color: var(--neon-cyan)"><b>${oppName}</b> s-a conectat!</span> ${state.opponentReady ? '<b>(Gata de Luptă! ✈️)</b>' : '(Își plasează avioanele...)'}`;
     } else {
-        oppStatus.innerHTML = `🟡 <span style="color: var(--neon-amber)">În așteptarea adversarului...</span>`;
+        oppStatus.innerHTML = `🟡 <span style="color: var(--neon-amber)">În așteptarea adversarului... Trimite link-ul!</span>`;
     }
 }
 
 function updateOpponentReadyIndicator() {
+    updatePlayerNamesUI();
     updateLobbyOpponentStatus();
 }
 
@@ -759,10 +833,14 @@ function fireAtEnemy(cellIndex) {
 function updateCombatStatusUI() {
     const turnIndicator = document.getElementById('combat-turn-indicator');
     const isMyTurn = state.currentTurn === state.role;
+    const myName = state.playerName || 'Tu';
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+
+    updatePlayerNamesUI();
 
     let turnText = isMyTurn 
-        ? `🎯 <span style="color: var(--neon-cyan); font-weight: bold;">RÂNDUL TĂU! Alege o coordonată pe radar</span>`
-        : `🛡️ <span style="color: var(--neon-amber)">Rândul adversarului... Se pregătește să tragă</span>`;
+        ? `🎯 <span style="color: var(--neon-cyan); font-weight: bold;">RÂNDUL TĂU (${myName})! Alege o coordonată pe radar</span>`
+        : `🛡️ <span style="color: var(--neon-amber)">Rândul lui ${oppName}... Se pregătește să tragă</span>`;
 
     if (state.lastCombatMessage) {
         turnIndicator.innerHTML = `<div>${turnText}</div><div style="font-size: 13px; margin-top: 5px; color: var(--text-muted);">${state.lastCombatMessage}</div>`;
@@ -781,17 +859,19 @@ function endGame(won) {
 
     const titleEl = document.getElementById('gameover-title');
     const msgEl = document.getElementById('gameover-message');
+    const myName = state.playerName || 'Pilot';
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'inamică';
 
     if (won) {
         soundFX.playVictory();
-        titleEl.textContent = '🏆 VICTORIE!';
+        titleEl.textContent = `🏆 VICTORIE, ${myName}!`;
         titleEl.style.color = 'var(--neon-gold)';
-        msgEl.textContent = 'Ai doborât întreaga flotă inamică!';
+        msgEl.textContent = `Ai doborât întreaga flotă a lui ${oppName}!`;
     } else {
         soundFX.playDefeat();
         titleEl.textContent = '💥 ÎNFRÂNGERE';
         titleEl.style.color = 'var(--neon-crimson)';
-        msgEl.textContent = 'Toate avioanele tale au fost doborâte!';
+        msgEl.textContent = `${oppName} a doborât toate avioanele tale!`;
     }
 
     document.getElementById('stat-my-hits').textContent = state.stats.myHits;
@@ -849,19 +929,108 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1. Inițializare parametri URL (ex: ?room=AV88)
+    // 1. Inițializare Nume Pilot (Memorat în localStorage)
+    const savedPilotName = localStorage.getItem('pilot_name') || '';
+    const menuPilotInput = document.getElementById('input-pilot-name');
+    const modalGuestInput = document.getElementById('input-modal-guest-name');
+    if (savedPilotName) {
+        state.playerName = savedPilotName;
+        if (menuPilotInput) menuPilotInput.value = savedPilotName;
+        if (modalGuestInput) modalGuestInput.value = savedPilotName;
+    }
+
+    if (menuPilotInput) {
+        menuPilotInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (val) {
+                state.playerName = val;
+                localStorage.setItem('pilot_name', val);
+                if (modalGuestInput) modalGuestInput.value = val;
+            }
+        });
+    }
+
+    if (modalGuestInput) {
+        modalGuestInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (val) {
+                state.playerName = val;
+                localStorage.setItem('pilot_name', val);
+                if (menuPilotInput) menuPilotInput.value = val;
+            }
+        });
+    }
+
+    // 2. Inițializare parametri URL (ex: ?room=AV88) - Afișează Modalul de Invitație conform cerinței
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('room');
     if (roomFromUrl) {
-        document.getElementById('input-join-room-code').value = roomFromUrl.toUpperCase();
+        const roomCode = roomFromUrl.toUpperCase();
+        document.getElementById('input-join-room-code').value = roomCode;
+        
+        const inviteRoomDisplay = document.getElementById('invite-room-display');
+        if (inviteRoomDisplay) inviteRoomDisplay.textContent = roomCode;
+
+        // Afișează modalul de invitație (conține: 1. Buton JOACĂ, 2. Buton DESCARCĂ APLICAȚIA, 3. NUMELE)
+        const inviteModal = document.getElementById('invite-welcome-modal');
+        if (inviteModal) {
+            inviteModal.classList.remove('hidden');
+        }
     }
 
-    // 2. Pre-completare chei Supabase din localStorage sau config.js
+    // 2.1 Butonul JOACĂ din modalul de invitație
+    const btnModalPlay = document.getElementById('btn-modal-join-play');
+    if (btnModalPlay) {
+        btnModalPlay.addEventListener('click', () => {
+            soundFX.playClick();
+            const guestInput = document.getElementById('input-modal-guest-name');
+            const enteredName = guestInput ? guestInput.value.trim() : '';
+            const finalName = enteredName || ('Pilot ' + Math.floor(100 + Math.random() * 900));
+            state.playerName = finalName;
+            localStorage.setItem('pilot_name', finalName);
+
+            const roomCode = document.getElementById('input-join-room-code').value.trim().toUpperCase();
+            document.getElementById('display-room-code').textContent = roomCode;
+
+            // Închide modalul
+            const inviteModal = document.getElementById('invite-welcome-modal');
+            if (inviteModal) inviteModal.classList.add('hidden');
+
+            // Conectare în cameră
+            connectToRoom(roomCode, 'guest');
+        });
+    }
+
+    // 2.2 Butonul DESCARCĂ APLICAȚIA din modalul de invitație
+    const btnModalDownload = document.getElementById('btn-modal-download-app');
+    if (btnModalDownload) {
+        btnModalDownload.addEventListener('click', async () => {
+            soundFX.playClick();
+            const guideBox = document.getElementById('modal-download-instructions');
+            if (guideBox) {
+                guideBox.classList.toggle('hidden');
+            }
+            if (deferredPrompt) {
+                try {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        deferredPrompt = null;
+                        if (guideBox) guideBox.classList.add('hidden');
+                    }
+                } catch (err) {
+                    console.warn(err);
+                }
+            }
+        });
+    }
+
+    // 3. Pre-completare chei Supabase din localStorage sau config.js
     const creds = getSupabaseCredentials();
     if (creds.url) document.getElementById('input-supabase-url').value = creds.url;
     if (creds.key) document.getElementById('input-supabase-key').value = creds.key;
 
-    // 3. Salvare setări Supabase
+    // 4. Salvare setări Supabase
     document.getElementById('btn-save-supabase').addEventListener('click', () => {
         const url = document.getElementById('input-supabase-url').value.trim();
         const key = document.getElementById('input-supabase-key').value.trim();
@@ -883,9 +1052,15 @@ document.addEventListener('DOMContentLoaded', () => {
         showScreen('menu-screen');
     });
 
-    // 4. Creare Cameră (Host)
+    // 5. Creare Cameră (Host)
     document.getElementById('btn-create-room').addEventListener('click', () => {
         soundFX.playClick();
+        const pilotInput = document.getElementById('input-pilot-name');
+        const nameVal = pilotInput ? pilotInput.value.trim() : '';
+        const finalName = nameVal || ('Comandant ' + Math.floor(100 + Math.random() * 900));
+        state.playerName = finalName;
+        localStorage.setItem('pilot_name', finalName);
+
         const variant = parseInt(document.querySelector('input[name="plane-variant"]:checked').value);
         const count = parseInt(document.getElementById('select-plane-count').value);
 
@@ -903,9 +1078,15 @@ document.addEventListener('DOMContentLoaded', () => {
         connectToRoom(code, 'host');
     });
 
-    // 5. Alăturare Cameră (Guest)
+    // 6. Alăturare Cameră directă (Guest)
     document.getElementById('btn-join-room').addEventListener('click', () => {
         soundFX.playClick();
+        const pilotInput = document.getElementById('input-pilot-name');
+        const nameVal = pilotInput ? pilotInput.value.trim() : '';
+        const finalName = nameVal || ('Pilot ' + Math.floor(100 + Math.random() * 900));
+        state.playerName = finalName;
+        localStorage.setItem('pilot_name', finalName);
+
         const codeInput = document.getElementById('input-join-room-code').value.trim().toUpperCase();
         if (codeInput.length < 3) {
             alert('Te rog introdu un cod valid de cameră!');
@@ -915,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
         connectToRoom(codeInput, 'guest');
     });
 
-    // 6. Copiere link cameră
+    // 7. Copiere link cameră
     document.getElementById('btn-copy-room-link').addEventListener('click', () => {
         soundFX.playRadarPing();
         const link = `${window.location.origin}${window.location.pathname}?room=${state.roomCode}`;
@@ -985,7 +1166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.myReady = true;
         document.getElementById('btn-ready-fleet').disabled = true;
         document.getElementById('btn-ready-fleet').textContent = '✅ În Așteptarea Adversarului...';
-        broadcastEvent('PLAYER_READY');
+        broadcastEvent('PLAYER_READY', { playerName: state.playerName });
         checkBothReadyToStart();
     });
 

@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=3) -->
-    <link rel="stylesheet" href="styles.css?v=3">
+    <!-- Design & Fonturi (cu cache-busting v=4) -->
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -38,6 +38,15 @@
          ECRAN 1: MENIU PRINCIPAL & LOBBY
          ======================================================== -->
     <main id="menu-screen" class="app-screen">
+        
+        <!-- Numele Pilotului (Profil) -->
+        <div class="pilot-profile-card">
+            <label for="input-pilot-name" class="pilot-name-label">
+                <span>👤</span> NUMELE TĂU DE PILOT:
+            </label>
+            <input type="text" id="input-pilot-name" class="form-input" placeholder="Introdu numele tău (ex: Alexandru)" maxlength="15" autocomplete="nickname">
+        </div>
+
         <div class="menu-grid">
             
             <!-- Card Gazdă (Host) -->
@@ -91,6 +100,19 @@
     <section id="setup-screen" class="app-screen hidden">
         <div class="setup-container">
             
+            <!-- Confruntare Piloți (Nume Jucători) -->
+            <div class="players-versus-card">
+                <div class="player-tag tag-me">
+                    <span class="player-role-badge">TU</span>
+                    <strong id="setup-my-name-display">Comandant</strong>
+                </div>
+                <div class="versus-badge">VS</div>
+                <div class="player-tag tag-opp">
+                    <span class="player-role-badge">ADVERSAR</span>
+                    <strong id="setup-opp-name-display">Se așteaptă...</strong>
+                </div>
+            </div>
+
             <!-- Badge Cameră -->
             <div class="room-badge-card">
                 <div>
@@ -175,7 +197,7 @@
                 <!-- Tabla de Atac (Tragi în inamic) -->
                 <div id="board-attack-container" class="board-wrapper">
                     <div class="board-label">
-                        <span>🎯 RADAR ȚINTĂ (INAMIC)</span>
+                        <span>🎯 RADAR ȚINTĂ (<span id="combat-opp-name" style="color: var(--neon-cyan)">INAMIC</span>)</span>
                         <span>Doborâte: <b id="enemy-planes-down-count" style="color: var(--neon-gold)">0 / 3</b></span>
                     </div>
                     <div class="radar-frame">
@@ -195,7 +217,7 @@
                 <!-- Tabla de Apărare (Avioanele tale) -->
                 <div id="board-defense-container" class="board-wrapper hidden-mobile">
                     <div class="board-label">
-                        <span>🛡️ FLOTA MEA</span>
+                        <span>🛡️ FLOTA MEA (<span id="combat-my-name" style="color: var(--neon-cyan)">TU</span>)</span>
                         <span>În viață: <b id="my-planes-alive-count" style="color: var(--neon-cyan)">3 / 3</b></span>
                     </div>
                     <div class="radar-frame">
@@ -268,10 +290,67 @@
         </div>
     </div>
 
-    <!-- Scripturi (cu cache-busting v=3) -->
+    <!-- ========================================================
+         MODAL 3: INVITAȚIE MISIUNE (PENTRU LINKUL TRIMIS JUCĂTORULUI)
+         Conține conform cerinței:
+         1. Butonul JOACĂ
+         2. Butonul DESCARCĂ APLICAȚIA
+         3. NUMELE (folosit pentru ca celălalt jucător să știe numele celuilalt)
+         ======================================================== -->
+    <div id="invite-welcome-modal" class="app-modal hidden">
+        <div class="modal-content neo-card" style="max-width: 420px;">
+            <div class="invite-header">
+                <span class="invite-icon">✈️</span>
+                <h2 class="modal-title" style="margin-top: 4px; font-size: 21px;">Invitație la Luptă!</h2>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: -2px;">
+                    Ai primit o provocare pentru camera <strong id="invite-room-display" style="color: var(--neon-cyan); font-family: var(--font-display); letter-spacing: 1px;">----</strong>.
+                </p>
+            </div>
+
+            <!-- 3. NUMELE -->
+            <div class="modal-form-group" style="width: 100%; text-align: left; margin: 8px 0 14px 0;">
+                <label for="input-modal-guest-name" style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <span>👤</span> NUMELE TĂU:
+                </label>
+                <input type="text" id="input-modal-guest-name" class="form-input" placeholder="Introdu numele tău (ex: Andrei)" maxlength="15" autocomplete="nickname">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
+                    Numele va fi transmis celuilalt jucător pentru a ști cu cine joacă.
+                </div>
+            </div>
+
+            <!-- 1. BUTONUL JOACĂ -->
+            <button id="btn-modal-join-play" class="btn-primary" style="margin-bottom: 8px;">
+                ▶️ JOACĂ
+            </button>
+
+            <!-- 2. BUTONUL DESCARCĂ APLICAȚIA -->
+            <button id="btn-modal-download-app" class="btn-secondary" style="margin-bottom: 6px;">
+                📥 DESCARCĂ APLICAȚIA
+            </button>
+
+            <!-- Ghid descărcare/instalare (apare la click pe Descarcă) -->
+            <div id="modal-download-instructions" class="install-guide-box hidden">
+                <div style="font-weight: 700; font-size: 12px; color: var(--neon-cyan); margin-bottom: 6px;">
+                    📱 Pe Telefon (iPhone & Android):
+                </div>
+                <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; margin: 0 0 8px 0; line-height: 1.5; text-align: left;">
+                    <li><b>iPhone (Safari):</b> Apasă pe <b>Partajare (Share ⎋)</b> din bara de jos a Safari ➔ <b>„Adaugă pe ecranul principal”</b>.</li>
+                    <li><b>Android (Chrome):</b> Apasă pe meniul <b>⋮</b> (dreapta sus) ➔ <b>„Instalează aplicația”</b>.</li>
+                </ul>
+                <div style="font-weight: 700; font-size: 12px; color: var(--neon-gold); margin-bottom: 4px;">
+                    💻 Pe Calculator (Desktop):
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 0; text-align: left;">
+                    Apasă pictograma <b>(⊕)</b> din bara de adrese URL a browserului pentru a descărca pe Desktop.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripturi (cu cache-busting v=4) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=3"></script>
-    <script src="sound.js?v=3"></script>
-    <script src="game.js?v=3"></script>
+    <script src="config.js?v=4"></script>
+    <script src="sound.js?v=4"></script>
+    <script src="game.js?v=4"></script>
 </body>
 </html>

@@ -232,6 +232,31 @@ body::before {
 /* ========================================================
    5. MENIU PRINCIPAL & LOBBY
    ======================================================== */
+.pilot-profile-card {
+    background: var(--neo-surface);
+    border: 1px solid var(--neo-border);
+    border-radius: 18px;
+    box-shadow: var(--neo-raised-shadow-sm);
+    padding: 14px 18px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.pilot-name-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--neon-cyan);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.8px;
+}
+
 .menu-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -367,6 +392,60 @@ body.light-theme .btn-primary {
     gap: 14px;
     width: 100%;
     max-width: 480px;
+}
+
+.players-versus-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: var(--cell-empty);
+    box-shadow: var(--neo-inset-shadow);
+    border: 1px solid var(--neo-border);
+    border-radius: 14px;
+    padding: 10px 16px;
+}
+
+.player-tag {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.player-tag.tag-me {
+    text-align: left;
+}
+
+.player-tag.tag-opp {
+    text-align: right;
+}
+
+.player-role-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+}
+
+.player-tag strong {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.player-tag.tag-me strong {
+    color: var(--neon-cyan);
+}
+
+.versus-badge {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--neon-gold);
+    background: var(--neo-surface);
+    box-shadow: var(--neo-raised-shadow-sm);
+    border: 1px solid var(--neo-border);
+    padding: 4px 10px;
+    border-radius: 20px;
 }
 
 .room-badge-card {
@@ -803,6 +882,30 @@ body.light-theme .app-modal {
     color: var(--text-muted);
 }
 
+/* Modal Invitație & Ghid Descărcare */
+.invite-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.invite-icon {
+    font-size: 36px;
+    filter: drop-shadow(var(--neon-cyan-glow));
+    animation: pulseFloat 2.5s ease-in-out infinite alternate;
+}
+
+.install-guide-box {
+    background: var(--cell-empty);
+    box-shadow: var(--neo-inset-shadow);
+    border: 1px solid var(--neo-border);
+    border-radius: 14px;
+    padding: 14px;
+    width: 100%;
+    margin-top: 6px;
+    animation: modalPop 0.25s ease-out;
+}
 
 /* ========================================================
    10. ANIMAȚII & ALERTE
