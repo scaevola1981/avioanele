@@ -1,11 +1,11 @@
 // Service Worker pentru Jocul de Avioane 8x8 (PWA)
-const CACHE_NAME = 'avioane-v16';
+const CACHE_NAME = 'avioane-v17';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=16',
-  './game.js?v=16',
-  './sound.js?v=16',
+  './styles.css?v=17',
+  './game.js?v=17',
+  './sound.js?v=17',
   './manifest.json',
   './public/icon-192.png',
   './public/icon-512.png',
@@ -45,18 +45,38 @@ self.addEventListener('fetch', (event) => {
   if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
     return;
   }
-  // Strategie Network-First cu fallback la cache (ideal pentru jocuri web PWA)
+
+  // Pentru documentul principal (navigare/HTML), folosește ÎNTOTDEAUNA rețeaua proaspătă (no-cache)
+  // pentru ca actualizările să apară instantaneu fără refresh manual!
+  if (event.request.mode === 'navigate' || event.request.destination === 'document' || event.request.url.includes('index.html')) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // Pentru restul fișierelor: Network First cu no-cache și fallback la cache offline
   event.respondWith(
-    fetch(event.request).then((networkResponse) => {
-      if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
-      }
-      return networkResponse;
-    }).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request, { cache: 'no-cache' })
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });

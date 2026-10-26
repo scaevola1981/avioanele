@@ -11,13 +11,18 @@
     <meta name="apple-mobile-web-app-title" content="Avioane 8x8">
     <meta name="mobile-web-app-capable" content="yes">
 
+    <!-- Prevenire cache vechi pe telefoane (Auto-Update fără refresh) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <!-- Iconițe Aplicație & Manifest PWA -->
     <link rel="icon" type="image/png" href="public/favicon.png">
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=15) -->
-    <link rel="stylesheet" href="styles.css?v=16">
+    <!-- Design & Fonturi (cu cache-busting v=17) -->
+    <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
 
@@ -460,18 +465,30 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=16) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=17) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=16"></script>
-    <script src="game.js?v=16"></script>
+    <script src="sound.js?v=17"></script>
+    <script src="game.js?v=17"></script>
 
-    <!-- Înregistrare Service Worker PWA -->
+    <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=16')
-                    .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
+                navigator.serviceWorker.register('./sw.js?v=17')
+                    .then(reg => {
+                        console.log('ServiceWorker PWA activat:', reg.scope);
+                        reg.update();
+                    })
                     .catch(err => console.warn('ServiceWorker warning:', err));
+            });
+
+            // Actualizare forțată imediat când utilizatorul deschide sau reintră în aplicație
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    navigator.serviceWorker.getRegistration().then(reg => {
+                        if (reg) reg.update();
+                    });
+                }
             });
         }
     </script>

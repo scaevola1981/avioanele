@@ -838,16 +838,16 @@ function handleShotResultReceived(payload) {
         soundFX.playPlaneDestroyed();
         state.stats.enemyDownedPlanes++;
         state.stats.myHits++;
-        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT! 💥</span> (Apasă „✏️ DEDUCE / MARCHEAZĂ” pentru a așeza avionul)`;
         
         // Regula clasică: NU dezvăluim corpul avionului automat! Doar capul este marcat.
         state.myShotsOnEnemy[cellIndex] = { status: 'HEAD' };
         
-        // Evidențiem butonul de deducere
-        const deductionBtn = document.getElementById('btn-toggle-deduction-mode');
-        if (deductionBtn) {
-            deductionBtn.classList.add('pulse-ready');
-        }
+        // Deschide AUTOMAT panoul de deducere instantaneu la lovitura de cap!
+        const hr = Math.floor(cellIndex / GRID_SIZE);
+        const hc = cellIndex % GRID_SIZE;
+        openDeductionForHead(hr, hc);
+
+        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT! 💥</span> Alege direcția și apasă <b>AȘEAZĂ</b>!`;
     } else if (status === 'HIT') {
         soundFX.playHit();
         state.stats.myHits++;
@@ -1379,6 +1379,41 @@ function handleDeductionCellClick(r, c) {
         }
     }
     
+    updateDeductionControlsUI();
+    renderAttackGrid();
+}
+
+function openDeductionForHead(r, c) {
+    state.isDeductionMode = true;
+    state.deductionPreviewHead = { r, c };
+
+    // Selectează prima orientare validă pentru acest cap
+    for (const testOrient of ['S', 'N', 'E', 'W']) {
+        const testCells = calculatePlaneCells(r, c, testOrient, state.planeVariant);
+        if (isWithinBounds(testCells)) {
+            state.deductionPreviewOrient = testOrient;
+            break;
+        }
+    }
+
+    const toggleBtn = document.getElementById('btn-toggle-deduction-mode');
+    const panel = document.getElementById('combat-deduction-panel');
+
+    if (toggleBtn) {
+        toggleBtn.classList.add('active-mode');
+        toggleBtn.classList.remove('pulse-ready');
+        toggleBtn.textContent = '❌ ÎNCHIDE MARCAJ';
+    }
+
+    if (panel) {
+        panel.classList.remove('hidden');
+        setTimeout(() => {
+            try {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (e) {}
+        }, 80);
+    }
+
     updateDeductionControlsUI();
     renderAttackGrid();
 }
