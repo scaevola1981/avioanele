@@ -258,22 +258,9 @@ const PEER_CONFIG = {
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:openrelay.metered.ca:80' },
-            {
-                urls: 'turn:openrelay.metered.ca:80',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            {
-                urls: 'turn:openrelay.metered.ca:443',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            {
-                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            }
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' }
         ]
     }
 };
@@ -298,6 +285,15 @@ function stopKeepAliveHeartbeat() {
         clearInterval(keepAliveTimer);
         keepAliveTimer = null;
     }
+}
+
+function generateRoomCode() {
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return code;
 }
 
 function getHostPeerId(roomCode) {
@@ -345,17 +341,22 @@ function connectToRoom(code, role, isResuming = false) {
 
         state.peer.on('connection', (conn) => {
             console.log('Client nou conectat la Host:', conn.peer);
+            if (state.activeConn && state.activeConn !== conn) {
+                try { state.activeConn.close(); } catch (e) {}
+            }
             setupConnection(conn);
         });
 
         state.peer.on('error', (err) => {
             console.warn('Eroare Peer Host:', err);
             if (err.type === 'unavailable-id') {
-                setTimeout(() => {
-                    if (state.role === 'host') {
-                        connectToRoom(code, role, true);
-                    }
-                }, 1500);
+                if (state.role === 'host') {
+                    const newCode = generateRoomCode();
+                    console.warn(`ID ${hostId} este ocupat pe server. Se alocă automat o cameră nouă: ${newCode}`);
+                    const disp = document.getElementById('display-room-code');
+                    if (disp) disp.textContent = newCode;
+                    connectToRoom(newCode, 'host');
+                }
             } else if (err.type === 'disconnected' || err.type === 'network') {
                 showReconnectBanner();
             }
@@ -374,11 +375,27 @@ function connectToRoom(code, role, isResuming = false) {
 
         const attemptGuestConnect = () => {
             if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
-                if (guestConnectTimer) clearInterval(guestConnectTimer);
+                if (guestConnectTimer) {
+                    clearInterval(guestConnectTimer);
+                    guestConnectTimer = null;
+                }
+                return;
+            }
+            if (state.activeConn && state.activeConn.open) {
+                if (guestConnectTimer) {
+                    clearInterval(guestConnectTimer);
+                    guestConnectTimer = null;
+                }
                 return;
             }
             guestConnectAttempts++;
             console.log(`[P2P] Guest conectare la Host: ${hostId} (încercarea #${guestConnectAttempts})`);
+
+            if (state.activeConn && !state.activeConn.open) {
+                try { state.activeConn.close(); } catch(e) {}
+                state.activeConn = null;
+            }
+
             const conn = state.peer.connect(hostId, {
                 reliable: true
             });
@@ -392,20 +409,27 @@ function connectToRoom(code, role, isResuming = false) {
             guestConnectTimer = setInterval(() => {
                 if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
                     clearInterval(guestConnectTimer);
+                    guestConnectTimer = null;
                     return;
                 }
-                if (guestConnectAttempts < 12) {
+                if (guestConnectAttempts < 15) {
                     attemptGuestConnect();
                 } else {
                     clearInterval(guestConnectTimer);
+                    guestConnectTimer = null;
                 }
-            }, 2500);
+            }, 4500);
         });
 
         state.peer.on('error', (err) => {
             console.warn('Eroare Peer Guest:', err);
             if (err.type === 'peer-unavailable') {
-                console.log('Gazda nu este încă online pe PeerJS, se reîncearcă automat...');
+                console.log('Gazda nu este încă online pe PeerJS, reîncercare în 2.5s...');
+                setTimeout(() => {
+                    if (!state.opponentConnected && state.peer && !state.peer.destroyed) {
+                        attemptGuestConnect();
+                    }
+                }, 2500);
             } else if (err.type === 'disconnected' || err.type === 'network') {
                 showReconnectBanner();
             }
@@ -421,9 +445,11 @@ function connectToRoom(code, role, isResuming = false) {
 }
 
 function setupConnection(conn) {
+    if (!conn) return;
     state.activeConn = conn;
 
     const handleOpen = () => {
+        if (state.activeConn !== conn) return;
         console.log('Conexiune WebRTC P2P Deschisă cu succes!');
         state.opponentConnected = true;
         if (guestConnectTimer) {
@@ -449,17 +475,24 @@ function setupConnection(conn) {
             broadcastEvent('PLAYER_READY', { playerName: state.playerName });
         }
 
-        if (state.role === 'host' && state.phase === 'BATTLE') {
-            broadcastEvent('SYNC_BATTLE_STATE', {
-                currentTurn: state.currentTurn,
-                hostShotsOnGuest: state.myShotsOnEnemy,
-                guestShotsOnHost: state.enemyShotsOnMe,
-                hostStats: state.stats,
-                planeCount: state.planeCount,
+        if (state.role === 'host') {
+            broadcastEvent('GAME_CONFIG', {
                 variant: state.planeVariant,
-                hostName: state.playerName,
-                guestName: state.opponentName
+                count: state.planeCount,
+                hostName: state.playerName
             });
+            if (state.phase === 'BATTLE') {
+                broadcastEvent('SYNC_BATTLE_STATE', {
+                    currentTurn: state.currentTurn,
+                    hostShotsOnGuest: state.myShotsOnEnemy,
+                    guestShotsOnHost: state.enemyShotsOnMe,
+                    hostStats: state.stats,
+                    planeCount: state.planeCount,
+                    variant: state.planeVariant,
+                    hostName: state.playerName,
+                    guestName: state.opponentName
+                });
+            }
         }
     };
 
@@ -474,6 +507,7 @@ function setupConnection(conn) {
     });
 
     conn.on('close', () => {
+        if (state.activeConn && state.activeConn !== conn) return;
         console.log('Conexiunea WebRTC cu adversarul s-a întrerupt');
         state.opponentConnected = false;
         stopKeepAliveHeartbeat();
@@ -1553,41 +1587,9 @@ function shareRoomInvite(pilotName) {
 
 // Semnalizare de fond P2P pentru notificări In-App între piloți
 function initPilotSignaling(pilotName) {
-    if (!pilotName) return;
-    const clean = pilotName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (clean.length < 2) return;
-    const pilotPeerId = 'av88-pilot-' + clean;
-
-    if (state.pilotPeer && state.pilotPeer.id === pilotPeerId && !state.pilotPeer.destroyed) {
-        return; // Deja activ
-    }
-
-    if (state.pilotPeer && !state.pilotPeer.destroyed) {
-        try { state.pilotPeer.destroy(); } catch (e) {}
-    }
-
-    try {
-        state.pilotPeer = new Peer(pilotPeerId, PEER_CONFIG);
-
-        state.pilotPeer.on('open', (id) => {
-            console.log('📡 Pilot P2P Beacon activat pentru:', id);
-        });
-
-        state.pilotPeer.on('connection', (conn) => {
-            conn.on('data', (data) => {
-                if (data && data.type === 'GAME_CHALLENGE') {
-                    handleIncomingChallenge(data);
-                }
-            });
-        });
-
-        state.pilotPeer.on('error', (err) => {
-            // Nu blocăm jocul dacă ID-ul este temporar ocupat în alt tab
-            console.warn('Pilot beacon notice:', err.type);
-        });
-    } catch (e) {
-        console.warn('Eroare inițializare pilot peer:', e);
-    }
+    // Dezactivat pentru a preveni coliziuni de ID pe PeerJS (ex: 'av88-pilot-vlad' ocupat)
+    // Conexiunea principală de joc funcționează direct și stabil prin state.peer
+    return;
 }
 
 function sendInAppInvite(targetPilotName, roomCode) {
@@ -1875,11 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.planeCount = count;
 
         // Generare cod de cameră din 4 caractere (ex: AV88)
-        const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let code = '';
-        for (let i = 0; i < 4; i++) {
-            code += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
+        const code = generateRoomCode();
 
         document.getElementById('display-room-code').textContent = code;
         connectToRoom(code, 'host');
@@ -2053,3 +2051,14 @@ window.addEventListener('beforeunload', () => {
         try { state.peer.destroy(); } catch (e) {}
     }
 });
+
+window.addEventListener('pagehide', () => {
+    saveMatchSession();
+    if (state.activeConn) {
+        try { state.activeConn.close(); } catch (e) {}
+    }
+    if (state.peer) {
+        try { state.peer.destroy(); } catch (e) {}
+    }
+});
+

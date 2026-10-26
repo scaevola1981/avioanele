@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=12) -->
-    <link rel="stylesheet" href="styles.css?v=12">
+    <!-- Design & Fonturi (cu cache-busting v=13) -->
+    <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 
@@ -427,16 +427,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=12) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=13) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=12"></script>
-    <script src="game.js?v=12"></script>
+    <script src="sound.js?v=13"></script>
+    <script src="game.js?v=13"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=12')
+                navigator.serviceWorker.register('./sw.js?v=13')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });
