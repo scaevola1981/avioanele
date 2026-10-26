@@ -1578,6 +1578,9 @@ function updateDeductionControlsUI() {
     }
 
     if (hintEl) {
+        const orientNames = { 'N': 'NORD ⬆️', 'S': 'SUD ⬇️', 'W': 'VEST ⬅️', 'E': 'EST ➡️' };
+        const orientLabel = orientNames[state.deductionPreviewOrient] || state.deductionPreviewOrient;
+
         if (state.deductionPreviewHead) {
             const coord = getCoordinateLabel(state.deductionPreviewHead.r * GRID_SIZE + state.deductionPreviewHead.c);
             const currentCells = calculatePlaneCells(
@@ -1587,9 +1590,9 @@ function updateDeductionControlsUI() {
                 state.planeVariant
             );
             if (isWithinBounds(currentCells)) {
-                hintEl.innerHTML = `🎯 Cap la <b>${coord}</b> (orientat ${state.deductionPreviewOrient}). Apasă <b>AȘEAZĂ</b>!`;
+                hintEl.innerHTML = `🎯 Cap la <b>${coord}</b> (orientat <b>${orientLabel}</b>). Apasă <b>AȘEAZĂ</b>!`;
             } else {
-                hintEl.innerHTML = `⚠️ Cap la <b>${coord}</b>, dar avionul iese din radar spre ${state.deductionPreviewOrient}. Alege altă direcție!`;
+                hintEl.innerHTML = `⚠️ Cap la <b>${coord}</b>, dar avionul iese din radar spre <b>${orientLabel}</b>. Alege altă direcție!`;
             }
         } else {
             hintEl.innerHTML = '👆 1. Atinge <b>Capul</b> pe radar &nbsp;|&nbsp; 2. Alege direcția și apasă <b>AȘEAZĂ</b>';

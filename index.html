@@ -21,8 +21,8 @@
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=17) -->
-    <link rel="stylesheet" href="styles.css?v=17">
+    <!-- Design & Fonturi (cu cache-busting v=18) -->
+    <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -289,16 +289,28 @@
                                 👆 1. Atinge <b>Capul</b> pe radar &nbsp;|&nbsp; 2. Alege direcția:
                             </div>
                             <div id="deduction-orientations-bar" class="deduction-orientations-bar">
-                                <button class="deduction-dir-btn" data-orient="N" type="button">⬆️ N</button>
-                                <button class="deduction-dir-btn" data-orient="S" type="button">⬇️ S</button>
-                                <button class="deduction-dir-btn" data-orient="W" type="button">⬅️ V</button>
-                                <button class="deduction-dir-btn" data-orient="E" type="button">➡️ E</button>
+                                <button class="deduction-dir-btn" data-orient="N" type="button" aria-label="Direcția Nord">
+                                    <span class="dir-arrow">⬆️</span>
+                                    <span class="dir-name">NORD</span>
+                                </button>
+                                <button class="deduction-dir-btn" data-orient="S" type="button" aria-label="Direcția Sud">
+                                    <span class="dir-arrow">⬇️</span>
+                                    <span class="dir-name">SUD</span>
+                                </button>
+                                <button class="deduction-dir-btn" data-orient="W" type="button" aria-label="Direcția Vest">
+                                    <span class="dir-arrow">⬅️</span>
+                                    <span class="dir-name">VEST</span>
+                                </button>
+                                <button class="deduction-dir-btn" data-orient="E" type="button" aria-label="Direcția Est">
+                                    <span class="dir-arrow">➡️</span>
+                                    <span class="dir-name">EST</span>
+                                </button>
                             </div>
                             <div class="deduction-actions-bar">
-                                <button id="btn-confirm-deduction" class="btn-primary" style="padding: 6px 16px; font-size: 13px;" type="button" disabled>
+                                <button id="btn-confirm-deduction" class="btn-primary" type="button" disabled>
                                     ✅ AȘEAZĂ
                                 </button>
-                                <button id="btn-cancel-deduction" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;" type="button">
+                                <button id="btn-cancel-deduction" class="btn-secondary" type="button">
                                     ÎNCHIDE
                                 </button>
                             </div>
@@ -465,16 +477,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=17) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=18) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=17"></script>
-    <script src="game.js?v=17"></script>
+    <script src="sound.js?v=18"></script>
+    <script src="game.js?v=18"></script>
 
     <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=17')
+                navigator.serviceWorker.register('./sw.js?v=18')
                     .then(reg => {
                         console.log('ServiceWorker PWA activat:', reg.scope);
                         reg.update();
