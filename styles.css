@@ -715,6 +715,9 @@ body.light-theme .btn-primary {
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
 }
 
 .grid-cell:hover {
@@ -878,31 +881,115 @@ body.light-theme .grid-cell.occupied.plane-color-3.plane-tail {
     background: rgba(5, 150, 105, 0.25) !important;
 }
 
-/* Căsuțe Lovituri în Luptă */
-.cell-shot.shot-miss {
-    background: rgba(40, 60, 90, 0.4);
-    box-shadow: var(--neo-inset-shadow);
-    color: var(--text-muted);
-    font-size: 22px;
+/* Căsuțe Lovituri în Luptă (Atac și Apărare) */
+.cell-shot.shot-miss,
+.incoming-shot.shot-miss,
+.defense-cell.shot-miss {
+    background: rgba(0, 150, 214, 0.35) !important;
+    border-color: rgba(0, 180, 216, 0.7) !important;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5) !important;
+    color: #48cae4 !important;
+    font-size: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    animation: splashPulse 0.35s ease-out;
 }
 
-.cell-shot.shot-hit {
-    background: radial-gradient(circle, #ff0054 20%, #7a0028 100%);
-    border-color: var(--neon-crimson);
-    box-shadow: var(--neon-crimson-glow);
+.cell-shot.shot-hit,
+.incoming-shot.shot-hit,
+.defense-cell.shot-hit {
+    background: radial-gradient(circle, #ff0054 30%, #7a0028 100%) !important;
+    border-color: var(--neon-crimson) !important;
+    box-shadow: 0 0 14px rgba(255, 0, 84, 0.8), inset 0 0 6px rgba(255, 255, 255, 0.5) !important;
+    color: #ffffff !important;
+    font-size: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     animation: impactPop 0.3s ease-out;
 }
 
-.cell-shot.shot-plane_body_down {
-    background: rgba(255, 183, 3, 0.35);
-    border-color: var(--neon-gold);
+.cell-shot.shot-plane_body_down,
+.incoming-shot.shot-plane_body_down,
+.defense-cell.shot-plane_body_down {
+    background: radial-gradient(circle, rgba(255, 183, 3, 0.45) 30%, rgba(184, 67, 0, 0.6) 100%) !important;
+    border-color: var(--neon-gold) !important;
+    box-shadow: 0 0 8px rgba(255, 183, 3, 0.6) !important;
+    color: #ffffff !important;
+    font-size: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
-.cell-shot.shot-head {
-    background: radial-gradient(circle, #ffb703 30%, #b84300 100%);
-    border-color: #fff;
-    box-shadow: var(--neon-gold-glow);
+.cell-shot.shot-head,
+.incoming-shot.shot-head,
+.defense-cell.shot-head {
+    background: radial-gradient(circle, #ffb703 30%, #b84300 100%) !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 16px rgba(255, 183, 3, 0.9), inset 0 0 8px #ffffff !important;
+    color: #ffffff !important;
+    font-size: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     animation: impactPop 0.4s ease-out, goldPulse 1.5s infinite alternate;
+}
+
+/* Stiluri Lovituri pentru Tema Luminoasă (Light Theme) */
+body.light-theme .cell-shot.shot-miss,
+body.light-theme .incoming-shot.shot-miss,
+body.light-theme .defense-cell.shot-miss {
+    background: rgba(0, 119, 182, 0.25) !important;
+    border-color: #0077b6 !important;
+    color: #0077b6 !important;
+}
+
+body.light-theme .cell-shot.shot-hit,
+body.light-theme .incoming-shot.shot-hit,
+body.light-theme .defense-cell.shot-hit {
+    background: radial-gradient(circle, #ff4d6d 30%, #c9184a 100%) !important;
+    border-color: #a4133c !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .cell-shot.shot-plane_body_down,
+body.light-theme .incoming-shot.shot-plane_body_down,
+body.light-theme .defense-cell.shot-plane_body_down {
+    background: rgba(255, 183, 3, 0.35) !important;
+    border-color: #e85d04 !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .cell-shot.shot-head,
+body.light-theme .incoming-shot.shot-head,
+body.light-theme .defense-cell.shot-head {
+    background: radial-gradient(circle, #ffb703 30%, #fb8500 100%) !important;
+    border-color: #d00000 !important;
+    color: #ffffff !important;
+}
+
+/* Indicare interactivă când este rândul tău să tragi */
+.attack-cell.can-fire {
+    cursor: crosshair;
+}
+.attack-cell.can-fire:hover,
+.attack-cell.can-fire:active {
+    border-color: var(--neon-cyan) !important;
+    box-shadow: 0 0 10px rgba(0, 245, 212, 0.6), inset 0 0 4px rgba(0, 245, 212, 0.3);
+    transform: scale(0.97);
+}
+
+.attack-cell:not(.can-fire):not(.cell-shot) {
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+@keyframes splashPulse {
+    0% { transform: scale(0.5); opacity: 0.3; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 .my-plane-cell {

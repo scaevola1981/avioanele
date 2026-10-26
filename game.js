@@ -778,8 +778,8 @@ function handleIncomingShot(cellIndex) {
     };
 
     const coord = getCoordinateLabel(cellIndex);
-    const statusLabel = resultStatus === 'HEAD' ? 'CAP DOBORÂT!' : (resultStatus === 'HIT' ? 'LOVIT!' : 'RATAT!');
-    state.lastCombatMessage = `🛡️ Inamicul a tras la <b>${coord}</b>: <span style="color: ${resultStatus === 'HEAD' ? 'var(--neon-gold)' : (resultStatus === 'HIT' ? 'var(--neon-crimson)' : 'var(--text-muted)')}">${statusLabel}</span>`;
+    const statusLabel = resultStatus === 'HEAD' ? 'CAP DOBORÂT! 💥' : (resultStatus === 'HIT' ? 'LOVIT! 🔥' : 'RATAT ÎN APĂ 🌊');
+    state.lastCombatMessage = `🛡️ Inamicul a tras la <b>${coord}</b>: <span style="color: ${resultStatus === 'HEAD' ? 'var(--neon-gold)' : (resultStatus === 'HIT' ? 'var(--neon-crimson)' : '#48cae4')}">${statusLabel}</span>`;
 
     // Trimite rezultatul înapoi trăgătorului
     broadcastEvent('SHOT_RESULT', {
@@ -799,20 +799,23 @@ function handleIncomingShot(cellIndex) {
         soundFX.playMiss();
     }
 
-    renderDefenseGrid();
-    updateCombatStatusUI();
-
     if (allDestroyed) {
         // Am pierdut toate avioanele -> Înfrângere
+        renderDefenseGrid();
+        renderAttackGrid();
+        updateCombatStatusUI();
+        saveMatchSession();
         setTimeout(() => {
             endGame(false);
         }, 1200);
     } else {
         // Tura se mută la mine!
         state.currentTurn = state.role;
+        renderDefenseGrid();
+        renderAttackGrid();
         updateCombatStatusUI();
+        saveMatchSession();
     }
-    saveMatchSession();
 }
 
 /**
@@ -828,7 +831,7 @@ function handleShotResultReceived(payload) {
         soundFX.playPlaneDestroyed();
         state.stats.enemyDownedPlanes++;
         state.stats.myHits++;
-        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT!</span>`;
+        state.lastCombatMessage = `🎯 Ai tras la <b>${coord}</b>: <span style="color: var(--neon-gold); font-weight: bold;">CAP DOBORÂT! 💥</span>`;
 
         // Marchează tot avionul doborât pe ecran
         if (planeDownCells && planeDownCells.length > 0) {
@@ -844,14 +847,15 @@ function handleShotResultReceived(payload) {
     } else {
         soundFX.playMiss();
         state.stats.myMisses++;
-        state.lastCombatMessage = `🌊 Ai tras la <b>${coord}</b>: <span style="color: var(--text-muted);">RATAT ÎN APĂ</span>`;
+        state.lastCombatMessage = `🌊 Ai tras la <b>${coord}</b>: <span style="color: #48cae4;">RATAT ÎN APĂ</span>`;
     }
-
-    renderAttackGrid();
-    updateCombatStatusUI();
 
     if (allDestroyed) {
         // Am doborât toate avioanele inamice -> Victorie!
+        renderAttackGrid();
+        renderDefenseGrid();
+        updateCombatStatusUI();
+        saveMatchSession();
         setTimeout(() => {
             endGame(true);
         }, 1200);
@@ -859,9 +863,11 @@ function handleShotResultReceived(payload) {
         // Tura trece la inamic
         const otherRole = state.role === 'host' ? 'guest' : 'host';
         state.currentTurn = otherRole;
+        renderAttackGrid();
+        renderDefenseGrid();
         updateCombatStatusUI();
+        saveMatchSession();
     }
-    saveMatchSession();
 }
 
 // ==========================================
@@ -1246,6 +1252,9 @@ function renderAttackGrid() {
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cellEl = document.createElement('div');
         cellEl.className = 'grid-cell attack-cell';
+        if (isMyTurn) {
+            cellEl.classList.add('can-fire');
+        }
         cellEl.dataset.index = i;
         const coord = getCoordinateLabel(i);
 
@@ -1259,14 +1268,15 @@ function renderAttackGrid() {
                 cellEl.innerHTML = '🔥';
                 cellEl.title = `${coord}: LOVIT`;
             } else if (shot.status === 'MISS') {
-                cellEl.innerHTML = '•';
-                cellEl.title = `${coord}: RATAT`;
+                cellEl.innerHTML = '🌊';
+                cellEl.title = `${coord}: RATAT ÎN APĂ`;
+            } else if (shot.status === 'PENDING') {
+                cellEl.innerHTML = '⏳';
+                cellEl.title = `${coord}: Se transmite...`;
             }
-        } else if (isMyTurn) {
-            cellEl.title = `Trage la coordonata ${coord}`;
-            cellEl.addEventListener('click', () => fireAtEnemy(i));
         } else {
-            cellEl.title = `Coordonata ${coord}`;
+            cellEl.title = isMyTurn ? `Trage la coordonata ${coord}` : `Așteaptă rândul (coordonata ${coord})`;
+            cellEl.addEventListener('click', () => fireAtEnemy(i));
         }
 
         gridEl.appendChild(cellEl);
@@ -1303,7 +1313,7 @@ function renderDefenseGrid() {
 
         const shot = state.enemyShotsOnMe[i];
         if (shot) {
-            cellEl.classList.add('incoming-shot', `shot-${shot.status.toLowerCase()}`);
+            cellEl.classList.add('cell-shot', 'incoming-shot', `shot-${shot.status.toLowerCase()}`);
             if (shot.status === 'HEAD') {
                 cellEl.innerHTML = '💥';
                 cellEl.title = `${coord}: CAP DOBORÂT!`;
@@ -1311,17 +1321,30 @@ function renderDefenseGrid() {
                 cellEl.innerHTML = '🔥';
                 cellEl.title = `${coord}: LOVIT`;
             } else if (shot.status === 'MISS') {
-                cellEl.innerHTML = '•';
-                cellEl.title = `${coord}: RATAT`;
+                cellEl.innerHTML = '🌊';
+                cellEl.title = `${coord}: RATAT ÎN APĂ`;
             }
         }
+
+        // Dacă jucătorul atinge propria flotă, îl ghidăm prietenos să tragă pe tabla de atac
+        cellEl.addEventListener('click', () => {
+            soundFX.playRadarPing();
+            state.lastCombatMessage = `ℹ️ Aceasta este <b>Flota Ta (${coord})</b>. Pentru a trage în inamic, atinge căsuțele din <b>RADAR ATAC</b> (mai jos)!`;
+            updateCombatStatusUI();
+        });
 
         gridEl.appendChild(cellEl);
     }
 }
 
 function fireAtEnemy(cellIndex) {
-    if (state.currentTurn !== state.role) return;
+    if (state.currentTurn !== state.role) {
+        soundFX.playRadarPing();
+        const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+        state.lastCombatMessage = `⏳ Rândul lui <b>${oppName}</b>! Așteaptă lovitura adversarului...`;
+        updateCombatStatusUI();
+        return;
+    }
     if (state.myShotsOnEnemy[cellIndex]) return; // Deja s-a tras aici
 
     soundFX.playShotLaunch();
@@ -1332,6 +1355,7 @@ function fireAtEnemy(cellIndex) {
     // Blocăm celula local pentru a preveni double-click
     state.myShotsOnEnemy[cellIndex] = { status: 'PENDING' };
     renderAttackGrid();
+    renderDefenseGrid();
     updateCombatStatusUI();
     saveMatchSession();
 
@@ -1341,6 +1365,7 @@ function fireAtEnemy(cellIndex) {
 
 function updateCombatStatusUI() {
     const turnIndicator = document.getElementById('combat-turn-indicator');
+    if (!turnIndicator) return;
     const isMyTurn = state.currentTurn === state.role;
     const myName = state.playerName || 'Tu';
     const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
@@ -1348,7 +1373,7 @@ function updateCombatStatusUI() {
     updatePlayerNamesUI();
 
     let turnText = isMyTurn 
-        ? `🎯 <span style="color: var(--neon-cyan); font-weight: bold;">RÂNDUL TĂU (${myName})! Alege o coordonată pe radar</span>`
+        ? `🎯 <span style="color: var(--neon-cyan); font-weight: bold;">RÂNDUL TĂU (${myName})! Atinge o căsuță pe RADAR ATAC</span>`
         : `🛡️ <span style="color: var(--neon-amber)">Rândul lui ${oppName}... Se pregătește să tragă</span>`;
 
     if (state.lastCombatMessage) {
@@ -1357,9 +1382,17 @@ function updateCombatStatusUI() {
         turnIndicator.innerHTML = `<div>${turnText}</div>`;
     }
 
+    if (isMyTurn) {
+        turnIndicator.classList.add('pulse-ready');
+    } else {
+        turnIndicator.classList.remove('pulse-ready');
+    }
+
     // Actualizează contoarele de avioane
-    document.getElementById('enemy-planes-down-count').textContent = `${state.stats.enemyDownedPlanes} / ${state.planeCount}`;
-    document.getElementById('my-planes-alive-count').textContent = `${state.planeCount - state.stats.myDownedPlanes} / ${state.planeCount}`;
+    const enemyDown = document.getElementById('enemy-planes-down-count');
+    const myAlive = document.getElementById('my-planes-alive-count');
+    if (enemyDown) enemyDown.textContent = `${state.stats.enemyDownedPlanes} / ${state.planeCount}`;
+    if (myAlive) myAlive.textContent = `${state.planeCount - state.stats.myDownedPlanes} / ${state.planeCount}`;
 }
 
 function endGame(won) {
