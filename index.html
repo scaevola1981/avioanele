@@ -21,8 +21,8 @@
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=19) -->
-    <link rel="stylesheet" href="styles.css?v=19">
+    <!-- Design & Fonturi (cu cache-busting v=20) -->
+    <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 
@@ -49,7 +49,7 @@
                 <span>⚡</span> MECI ÎN DESFĂȘURARE DETECTAT!
             </div>
             <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0 10px 0;">
-                Ai un meci neterminat în camera <b id="resume-room-code" style="color: var(--neon-cyan);">----</b> (<span id="resume-role-text">Gazdă</span>).
+                Ai un meci neterminat în camera <b id="resume-room-code" class="room-code-inline" style="color: var(--neon-cyan);">----</b> (<span id="resume-role-text">Gazdă</span>).
             </div>
             <div style="display: flex; gap: 8px;">
                 <button id="btn-resume-game" class="btn-primary" style="padding: 10px 14px; font-size: 13px; flex: 1;">▶️ REIA JOCUL</button>
@@ -114,7 +114,7 @@
             <div class="glass-card">
                 <h2 class="menu-section-title"><span>🎯</span> Alătură-te unei Misiuni</h2>
                 <label for="input-join-room-code" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: block;">Cod Cameră (4 caractere):</label>
-                <input type="text" id="input-join-room-code" class="form-input" placeholder="Ex: AV88" maxlength="6" style="text-transform: uppercase; font-family: var(--font-display); letter-spacing: 2px;">
+                <input type="text" id="input-join-room-code" class="form-input room-code-input" placeholder="Ex: AV88" maxlength="6" autocomplete="off" spellcheck="false">
                 <button id="btn-join-room" class="btn-primary">INTRĂ ÎN JOC</button>
             </div>
 
@@ -353,7 +353,7 @@
                 <span class="invite-icon">✈️</span>
                 <h2 class="modal-title" style="margin-top: 4px; font-size: 21px;">Invitație la Luptă!</h2>
                 <p style="font-size: 13px; color: var(--text-muted); margin-top: -2px;">
-                    Ai primit o provocare pentru camera <strong id="invite-room-display" style="color: var(--neon-cyan); font-family: var(--font-display); letter-spacing: 1px;">----</strong>.
+                    Ai primit o provocare pentru camera <strong id="invite-room-display" class="room-code-inline" style="color: var(--neon-cyan);">----</strong>.
                 </p>
             </div>
 
@@ -405,7 +405,7 @@
             <div style="font-size: 40px; animation: impactPop 0.5s ease-out;">🚨</div>
             <h2 class="modal-title" style="color: var(--neon-gold); font-size: 20px; margin-top: 6px;">PROVOCARE LA LUPTĂ!</h2>
             <p style="font-size: 14px; color: var(--text-muted); line-height: 1.4; margin: 10px 0 16px 0;">
-                Pilotul <strong id="challenge-challenger-name" style="color: var(--neon-cyan);">Comandant</strong> te invită să jucați în camera <strong id="challenge-room-code" style="color: var(--neon-gold); font-family: var(--font-display); letter-spacing: 2px;">----</strong>!
+                Pilotul <strong id="challenge-challenger-name" style="color: var(--neon-cyan);">Comandant</strong> te invită să jucați în camera <strong id="challenge-room-code" class="room-code-inline" style="color: var(--neon-gold);">----</strong>!
             </p>
             <button id="btn-accept-challenge" class="btn-primary" style="margin-bottom: 8px;">⚔️ ACCEPTĂ LUPTA</button>
             <button id="btn-decline-challenge" class="btn-secondary">Refuză</button>
@@ -470,16 +470,16 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=19) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=20) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=19"></script>
-    <script src="game.js?v=19"></script>
+    <script src="sound.js?v=20"></script>
+    <script src="game.js?v=20"></script>
 
     <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=19')
+                navigator.serviceWorker.register('./sw.js?v=20')
                     .then(reg => {
                         console.log('ServiceWorker PWA activat:', reg.scope);
                         reg.update();

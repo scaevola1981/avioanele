@@ -3,7 +3,7 @@
    NEO-SKEUOMORPHISM DESIGN SYSTEM (Dark & Light Themes)
    ======================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700;800&family=Orbitron:wght@600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 /* ========================================================
    1. SISTEMUL DE VARIABILE (THEME TOKENS)
@@ -46,6 +46,7 @@
 
     --font-display: 'Orbitron', monospace;
     --font-ui: 'Outfit', -apple-system, sans-serif;
+    --font-code: 'JetBrains Mono', 'Roboto Mono', 'SF Mono', Consolas, monospace;
 }
 
 /* --- TEMA LIGHT (Tactical Daylight Aluminum Desk) --- */
@@ -488,12 +489,67 @@ body.light-theme .btn-primary {
 }
 
 .room-code-tag {
-    font-family: var(--font-display);
-    font-size: 20px;
-    font-weight: 900;
+    font-family: var(--font-code);
+    font-size: 24px;
+    font-weight: 800;
     color: var(--neon-gold);
-    letter-spacing: 2px;
+    letter-spacing: 4px;
     text-shadow: var(--neon-gold-glow);
+    font-variant-numeric: slashed-zero;
+    user-select: all;
+    display: inline-block;
+}
+
+body.light-theme .room-code-tag {
+    color: #b45309;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.room-code-input {
+    font-family: var(--font-code) !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    letter-spacing: 5px !important;
+    text-transform: uppercase;
+    text-align: center;
+    font-variant-numeric: slashed-zero;
+    color: var(--neon-cyan) !important;
+    border: 1.5px solid rgba(0, 245, 212, 0.45) !important;
+    background: var(--cell-empty) !important;
+    box-shadow: var(--neo-inset-shadow), 0 0 10px rgba(0, 245, 212, 0.12) !important;
+    padding: 12px 14px !important;
+    transition: all 0.2s ease;
+}
+
+.room-code-input:focus {
+    border-color: var(--neon-cyan) !important;
+    box-shadow: var(--neo-inset-shadow), 0 0 16px rgba(0, 245, 212, 0.4) !important;
+}
+
+.room-code-input::placeholder {
+    letter-spacing: 2px;
+    font-size: 15px;
+    opacity: 0.55;
+    font-weight: 500;
+}
+
+body.light-theme .room-code-input {
+    color: #0077b6 !important;
+    border-color: rgba(0, 119, 182, 0.45) !important;
+    background: #ffffff !important;
+    box-shadow: inset 2px 2px 5px #cbd5e1, 0 0 8px rgba(0, 119, 182, 0.15) !important;
+}
+
+body.light-theme .room-code-input:focus {
+    border-color: #0077b6 !important;
+    box-shadow: inset 2px 2px 5px #cbd5e1, 0 0 14px rgba(0, 119, 182, 0.35) !important;
+}
+
+.room-code-inline {
+    font-family: var(--font-code) !important;
+    font-variant-numeric: slashed-zero;
+    letter-spacing: 2px;
+    font-weight: 700;
 }
 
 .status-indicator {

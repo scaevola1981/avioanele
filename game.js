@@ -297,7 +297,8 @@ function stopKeepAliveHeartbeat() {
 }
 
 function generateRoomCode() {
-    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    // Exclude caractere ușor de confundat: D, O, 0 (zero), I, 1
+    const characters = 'ABCEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 4; i++) {
         code += characters.charAt(Math.floor(Math.random() * characters.length));
@@ -2196,6 +2197,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('display-room-code').textContent = code;
         connectToRoom(code, 'host');
     });
+
+    // Formatare automată & Enter pentru input cod cameră
+    const joinCodeInputEl = document.getElementById('input-join-room-code');
+    if (joinCodeInputEl) {
+        joinCodeInputEl.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase().replace(/\s+/g, '');
+        });
+        joinCodeInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btn-join-room').click();
+            }
+        });
+    }
 
     // 6. Alăturare Cameră directă (Guest)
     document.getElementById('btn-join-room').addEventListener('click', () => {
