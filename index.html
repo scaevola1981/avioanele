@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=5) -->
-    <link rel="stylesheet" href="styles.css?v=5">
+    <!-- Design & Fonturi (cu cache-busting v=6) -->
+    <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
@@ -51,6 +51,15 @@
                 <button id="btn-discard-session" class="btn-secondary" style="padding: 10px 12px; font-size: 13px; width: auto;">Renunță</button>
             </div>
         </div>
+
+        <!-- Buton Descărcare Aplicație pe Telefon -->
+        <button id="btn-menu-download-app" class="btn-install-banner">
+            <span>📲</span>
+            <div style="text-align: left;">
+                <div style="font-size: 13px; font-weight: 800; color: var(--neon-cyan);">DESCARCĂ APLICAȚIA PE TELEFON</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Instalează jocul pe ecranul principal pentru acces rapid</div>
+            </div>
+        </button>
 
         <!-- Numele Pilotului (Profil) -->
         <div class="pilot-profile-card">
@@ -105,6 +114,12 @@
             </div>
 
         </div>
+
+        <!-- Card Piloți Recenți cu care ai mai jucat -->
+        <div id="recent-opponents-card" class="glass-card hidden" style="margin-top: 14px; width: 100%; max-width: 480px;">
+            <h2 class="menu-section-title"><span>👥</span> Piloți cu care ai mai luptat</h2>
+            <div id="recent-opponents-list" class="recent-pilots-list"></div>
+        </div>
     </main>
 
     <!-- ========================================================
@@ -126,13 +141,22 @@
                 </div>
             </div>
 
-            <!-- Badge Cameră -->
+            <!-- Badge Cameră & Buton Invită -->
             <div class="room-badge-card">
                 <div>
                     <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Cod Cameră</div>
                     <span id="display-room-code" class="room-code-tag">----</span>
                 </div>
-                <button id="btn-copy-room-link" class="btn-secondary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 14px;">🔗 Copiază Link</button>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-invite-opponent" class="btn-primary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 14px;">📤 INVITĂ</button>
+                    <button id="btn-copy-room-link" class="btn-secondary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 12px;">🔗 Copiază</button>
+                </div>
+            </div>
+
+            <!-- Listă rapidă de invitație piloți recenți dacă există -->
+            <div id="setup-recent-invite-box" class="setup-quick-invite hidden">
+                <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Sau invită un pilot recent:</span>
+                <div id="setup-recent-invite-list" class="quick-pilots-row"></div>
             </div>
 
             <!-- Stare Conectare Adversar -->
@@ -146,20 +170,15 @@
                 <span>Avioane plasate: <b id="setup-rule-count" style="color: var(--neon-cyan);">0 / 3</b></span>
             </div>
 
-            <!-- Selector Orientare -->
-            <div class="orientation-selector">
-                <button class="btn-orient active" data-orient="N" title="Orientat spre Nord">
-                    <span>▲</span> NORD
-                </button>
-                <button class="btn-orient" data-orient="E" title="Orientat spre Est">
-                    <span>▶</span> EST
-                </button>
-                <button class="btn-orient" data-orient="S" title="Orientat spre Sud">
-                    <span>▼</span> SUD
-                </button>
-                <button class="btn-orient" data-orient="W" title="Orientat spre Vest">
-                    <span>◀</span> VEST
-                </button>
+            <!-- Ghid & Selector Orientare Interactivă (Point 1: fără butoane statice N,E,S,V) -->
+            <div id="setup-instruction-hint" class="setup-hint-badge">
+                👆 Atinge o căsuță pentru Capul avionului, apoi alege conturul
+            </div>
+
+            <!-- Bare de direcții care apar automat când capul este selectat -->
+            <div id="placement-orientation-bar" class="direction-pills-bar hidden">
+                <span class="pills-label">Apasă pe contur sau alege direcția:</span>
+                <div id="direction-pills-container" class="pills-list"></div>
             </div>
 
             <!-- Tabla de Plasare 8x8 cu Coordonate -->
@@ -338,9 +357,35 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=5) -->
+    <!-- ========================================================
+         MODAL 3: PROVOCARE RAPIDĂ ÎNTRE PILOȚI (IN-APP CHALLENGE)
+         ======================================================== -->
+    <div id="in-app-challenge-modal" class="app-modal hidden">
+        <div class="modal-content neo-card" style="max-width: 380px; text-align: center;">
+            <div style="font-size: 40px; animation: impactPop 0.5s ease-out;">🚨</div>
+            <h2 class="modal-title" style="color: var(--neon-gold); font-size: 20px; margin-top: 6px;">PROVOCARE LA LUPTĂ!</h2>
+            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.4; margin: 10px 0 16px 0;">
+                Pilotul <strong id="challenge-host-name" style="color: var(--neon-cyan);">Comandant</strong> te invită să jucați în camera <strong id="challenge-room-code" style="color: var(--neon-gold); font-family: var(--font-display); letter-spacing: 2px;">----</strong>!
+            </p>
+            <button id="btn-accept-challenge" class="btn-primary" style="margin-bottom: 8px;">⚔️ ACCEPTĂ LUPTA</button>
+            <button id="btn-decline-challenge" class="btn-secondary">Refuză</button>
+        </div>
+    </div>
+
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=6) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=5"></script>
-    <script src="game.js?v=5"></script>
+    <script src="sound.js?v=6"></script>
+    <script src="game.js?v=6"></script>
+
+    <!-- Înregistrare Service Worker PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js?v=6')
+                    .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
+                    .catch(err => console.warn('ServiceWorker warning:', err));
+            });
+        }
+    </script>
 </body>
 </html>
