@@ -1395,3 +1395,61 @@ body.light-theme .app-modal {
     border-color: var(--neon-cyan);
     color: var(--neon-cyan);
 }
+
+/* ========================================================
+   MODAL GHID INSTALARE PWA (IOS & ANDROID)
+   ======================================================== */
+.pwa-guide-content {
+    width: 100%;
+}
+
+.ios-install-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+}
+
+.ios-step-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--cell-empty);
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--neo-border);
+    box-shadow: var(--neo-inset-shadow);
+}
+
+.step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--neon-cyan);
+    color: #030a16;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px var(--neon-cyan);
+}
+
+.step-desc {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+
+.share-icon-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    background: var(--neo-card-bg);
+    border: 1px solid var(--neo-border);
+    border-radius: 6px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+}

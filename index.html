@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=8) -->
-    <link rel="stylesheet" href="styles.css?v=8">
+    <!-- Design & Fonturi (cu cache-busting v=9) -->
+    <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 
@@ -366,16 +366,74 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=8) -->
+    <!-- ========================================================
+         MODAL 4: GHID INSTALARE APLICAȚIE (PWA)
+         ======================================================== -->
+    <div id="pwa-install-modal" class="app-modal hidden">
+        <div class="modal-content neo-card" style="max-width: 400px; text-align: center;">
+            <div style="font-size: 38px; margin-bottom: 4px;">📲</div>
+            <h2 id="pwa-modal-title" class="modal-title" style="color: var(--neon-cyan); font-size: 19px; margin-bottom: 6px;">INSTALARE PE TELEFON</h2>
+            
+            <div id="pwa-guide-ios" class="pwa-guide-content">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+                    Pe dispozitivele <strong>Apple (iPhone / iPad)</strong>, adăugarea pe ecran se face direct din Safari:
+                </p>
+                <div class="ios-install-steps">
+                    <div class="ios-step-row">
+                        <div class="step-num">1</div>
+                        <div class="step-desc">Apasă butonul de <strong>Partajare (Share)</strong> <span class="share-icon-badge">⎋</span> sau <span class="share-icon-badge">⬆️</span> din bara de jos a Safari.</div>
+                    </div>
+                    <div class="ios-step-row">
+                        <div class="step-num">2</div>
+                        <div class="step-desc">Derulează meniul în jos și alege <strong>„Adaugă pe ecranul principal”</strong> (Add to Home Screen ➕).</div>
+                    </div>
+                    <div class="ios-step-row">
+                        <div class="step-num">3</div>
+                        <div class="step-desc">Apasă pe <strong>„Adaugă”</strong> (Add) în colțul dreapta-sus.</div>
+                    </div>
+                </div>
+                <p style="font-size: 12px; color: var(--neon-gold); margin-top: 12px; margin-bottom: 0;">
+                    Iconița jocului va apărea direct pe ecranul telefonului tău! ✈️
+                </p>
+            </div>
+
+            <div id="pwa-guide-android" class="pwa-guide-content hidden">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+                    Pentru a instala aplicația pe <strong>Android</strong> sau <strong>Desktop</strong>:
+                </p>
+                <div class="ios-install-steps">
+                    <div class="ios-step-row">
+                        <div class="step-num">1</div>
+                        <div class="step-desc">Deschide meniul browserului <strong>⋮</strong> (cele 3 puncte din dreapta-sus).</div>
+                    </div>
+                    <div class="ios-step-row">
+                        <div class="step-num">2</div>
+                        <div class="step-desc">Alege <strong>„Instalează aplicația”</strong> sau <strong>„Adaugă la ecranul de pornire”</strong>.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pwa-guide-installed" class="pwa-guide-content hidden">
+                <div style="font-size: 32px; margin: 10px 0;">🎉</div>
+                <p style="font-size: 14px; color: var(--neon-emerald); font-weight: 700;">
+                    Aplicația este deja instalată și rulează pe telefonul tău!
+                </p>
+            </div>
+
+            <button id="btn-close-pwa-modal" class="btn-primary" style="margin-top: 16px; width: 100%;">AM ÎNȚELES</button>
+        </div>
+    </div>
+
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=9) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=8"></script>
-    <script src="game.js?v=8"></script>
+    <script src="sound.js?v=9"></script>
+    <script src="game.js?v=9"></script>
 
     <!-- Înregistrare Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=8')
+                navigator.serviceWorker.register('./sw.js?v=9')
                     .then(reg => console.log('ServiceWorker PWA activat:', reg.scope))
                     .catch(err => console.warn('ServiceWorker warning:', err));
             });

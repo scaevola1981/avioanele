@@ -1522,6 +1522,15 @@ function handleIncomingChallenge(data) {
 
 function triggerAppInstall() {
     soundFX.playClick();
+    
+    // 1. Verifică dacă aplicația este deja deschisă ca aplicație PWA pe ecran
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) {
+        showPwaModal('installed');
+        return;
+    }
+
+    // 2. Pe Android / Chrome unde există prompt automat nativ oferit de browser
     if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
@@ -1531,15 +1540,43 @@ function triggerAppInstall() {
                 if (menuInstallBtn) menuInstallBtn.style.display = 'none';
             }
         }).catch(err => console.warn(err));
-    } else {
-        // Instrucțiuni pe mobil în funcție de dispozitiv
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIOS) {
-            alert('📲 INSTALARE PE IPHONE / IPAD:\n\n1. Apasă butonul „Partajare” (pătratul cu săgeată în sus ⬆️ din Safari).\n2. Derulează în jos și alege „Adaugă pe ecranul principal” (Add to Home Screen).\n3. Apasă „Adaugă” dreapta-sus.');
-        } else {
-            alert('📲 INSTALARE PE ANDROID / DESKTOP:\n\n1. Deschide meniul browserului (cele 3 puncte verticale ⋮ din colțul dreapta-sus).\n2. Alege „Instalează aplicația” sau „Adaugă la ecranul de pornire”.\n3. Aplicația va apărea ca iconiță separată pe ecranul telefonului!');
-        }
+        return;
     }
+
+    // 3. Pe iOS Safari sau alte browsere unde Apple/browserul cere adăugarea din meniu
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+        showPwaModal('ios');
+    } else {
+        showPwaModal('android');
+    }
+}
+
+function showPwaModal(type) {
+    const modal = document.getElementById('pwa-install-modal');
+    if (!modal) return;
+
+    const guideIOS = document.getElementById('pwa-guide-ios');
+    const guideAndroid = document.getElementById('pwa-guide-android');
+    const guideInstalled = document.getElementById('pwa-guide-installed');
+    const titleEl = document.getElementById('pwa-modal-title');
+
+    if (guideIOS) guideIOS.classList.add('hidden');
+    if (guideAndroid) guideAndroid.classList.add('hidden');
+    if (guideInstalled) guideInstalled.classList.add('hidden');
+
+    if (type === 'ios') {
+        if (titleEl) titleEl.textContent = '📲 INSTALARE PE IPHONE';
+        if (guideIOS) guideIOS.classList.remove('hidden');
+    } else if (type === 'installed') {
+        if (titleEl) titleEl.textContent = '✅ APLICAȚIE INSTALATĂ';
+        if (guideInstalled) guideInstalled.classList.remove('hidden');
+    } else {
+        if (titleEl) titleEl.textContent = '📲 INSTALARE APLICAȚIE';
+        if (guideAndroid) guideAndroid.classList.remove('hidden');
+    }
+
+    modal.classList.remove('hidden');
 }
 
 // ==========================================
@@ -1656,6 +1693,23 @@ document.addEventListener('DOMContentLoaded', () => {
         btnModalDownload.addEventListener('click', () => {
             triggerAppInstall();
         });
+    }
+
+    // Închidere modal Ghid Instalare PWA
+    const btnClosePwa = document.getElementById('btn-close-pwa-modal');
+    if (btnClosePwa) {
+        btnClosePwa.addEventListener('click', () => {
+            soundFX.playClick();
+            const pwaModal = document.getElementById('pwa-install-modal');
+            if (pwaModal) pwaModal.classList.add('hidden');
+        });
+    }
+
+    // Ascunde butoanele de instalare dacă utilizatorul a deschis deja aplicația din ecranul principal (standalone)
+    const isStandaloneMode = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandaloneMode) {
+        if (btnMenuDownload) btnMenuDownload.style.display = 'none';
+        if (btnModalDownload) btnModalDownload.style.display = 'none';
     }
 
     // 3. Verificare meci în desfășurare (Persistență sesiune dacă nu s-a terminat jocul)
