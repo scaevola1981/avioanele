@@ -263,29 +263,301 @@ function resumeMatch(session) {
 const PEER_CONFIG = {
     debug: 1,
     config: {
+        iceCandidatePoolSize: 10,
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
             { urls: 'stun:stun4.l.google.com:19302' },
-            { urls: 'stun:stun.cloudflare.com:3478' }
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.nextcloud.com:443' }
         ]
     }
 };
 
+// ==========================================
+// 2.1. RELEU CLOUD WSS (MULTI-BROKER MQTT OVER TLS/443+)
+// Asigură conectivitate 100% între orașe / 4G / 5G / CGNAT / Symmetric NAT
+// chiar și atunci când operatorii mobili blochează pachetele UDP WebRTC directe.
+// ==========================================
+const CLOUD_RELAY_BROKERS = [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt'
+];
+
+const MY_INSTANCE_ID = `av88-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const seenMessageIds = new Set();
+let cloudRelaySockets = [];
+let cloudRelayPingTimer = null;
+let discoveryBeaconTimer = null;
+let lastOpponentSeenAt = 0;
+
+function mqttEncodeLength(len) {
+    const bytes = [];
+    do {
+        let digit = len % 128;
+        len = Math.floor(len / 128);
+        if (len > 0) digit |= 0x80;
+        bytes.push(digit);
+    } while (len > 0);
+    return new Uint8Array(bytes);
+}
+
+function mqttEncodeUTF8(str) {
+    const buf = new TextEncoder().encode(str);
+    const out = new Uint8Array(2 + buf.length);
+    out[0] = (buf.length >> 8) & 0xff;
+    out[1] = buf.length & 0xff;
+    out.set(buf, 2);
+    return out;
+}
+
+function mqttConcatBytes(...arrays) {
+    const total = arrays.reduce((acc, a) => acc + a.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const a of arrays) {
+        out.set(a, offset);
+        offset += a.length;
+    }
+    return out;
+}
+
+function mqttBuildConnect(clientId) {
+    // MQTT v3.1.1 CONNECT packet (CleanSession=1, KeepAlive=60s)
+    const vh = new Uint8Array([0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x3c]);
+    const pl = mqttEncodeUTF8(clientId);
+    const rem = mqttConcatBytes(vh, pl);
+    return mqttConcatBytes(new Uint8Array([0x10]), mqttEncodeLength(rem.length), rem);
+}
+
+function mqttBuildSubscribe(topic) {
+    const pid = new Uint8Array([0x00, 0x01]);
+    const rem = mqttConcatBytes(pid, mqttEncodeUTF8(topic), new Uint8Array([0x00]));
+    return mqttConcatBytes(new Uint8Array([0x82]), mqttEncodeLength(rem.length), rem);
+}
+
+function mqttBuildPublish(topic, jsonObj) {
+    const top = mqttEncodeUTF8(topic);
+    const data = new TextEncoder().encode(JSON.stringify(jsonObj));
+    const rem = mqttConcatBytes(top, data);
+    return mqttConcatBytes(new Uint8Array([0x30]), mqttEncodeLength(rem.length), rem);
+}
+
+function mqttParsePackets(buf, onPublish, onSuback, onConnack) {
+    let offset = 0;
+    while (offset < buf.length) {
+        const type = buf[offset];
+        let mult = 1;
+        let remLen = 0;
+        let idx = offset + 1;
+        while (idx < buf.length) {
+            const b = buf[idx++];
+            remLen += (b & 0x7f) * mult;
+            mult *= 128;
+            if ((b & 0x80) === 0) break;
+        }
+        if (idx + remLen > buf.length) break;
+        const packetData = buf.subarray(idx, idx + remLen);
+        const packetType = type & 0xf0;
+        if (packetType === 0x20 && onConnack) {
+            onConnack();
+        } else if (packetType === 0x90 && onSuback) {
+            onSuback();
+        } else if (packetType === 0x30 && onPublish) {
+            try {
+                const topLen = (packetData[0] << 8) | packetData[1];
+                let payloadStart = 2 + topLen;
+                const qos = (type >> 1) & 0x03;
+                if (qos > 0) payloadStart += 2;
+                const jsonStr = new TextDecoder().decode(packetData.subarray(payloadStart));
+                const parsed = JSON.parse(jsonStr);
+                onPublish(parsed);
+            } catch (e) {
+                console.warn('[Relay] Eroare parsare pachet:', e);
+            }
+        }
+        offset = idx + remLen;
+    }
+}
+
+function getRoomRelayTopic(roomCode) {
+    return `avioane88/v22/room/${(roomCode || '').trim().toUpperCase()}`;
+}
+
+function isCloudRelayConnected() {
+    return cloudRelaySockets.some(s => s && s.readyState === WebSocket.OPEN && s._mqttSubscribed);
+}
+
+function stopCloudRelay() {
+    if (cloudRelayPingTimer) {
+        clearInterval(cloudRelayPingTimer);
+        cloudRelayPingTimer = null;
+    }
+    if (discoveryBeaconTimer) {
+        clearInterval(discoveryBeaconTimer);
+        discoveryBeaconTimer = null;
+    }
+    for (const ws of cloudRelaySockets) {
+        if (ws) {
+            ws._intentionalClose = true;
+            try { ws.close(); } catch (e) {}
+        }
+    }
+    cloudRelaySockets = [];
+}
+
+function startCloudRelay(roomCode) {
+    stopCloudRelay();
+    if (!roomCode) return;
+
+    const topic = getRoomRelayTopic(roomCode);
+
+    const connectBroker = (brokerUrl, index) => {
+        if (!state.roomCode || state.roomCode.toUpperCase() !== roomCode.toUpperCase()) return;
+        let ws;
+        try {
+            ws = new WebSocket(brokerUrl, 'mqtt');
+        } catch (e) {
+            console.warn('[Relay] Nu s-a putut inițializa WebSocket:', brokerUrl, e);
+            return;
+        }
+        ws.binaryType = 'arraybuffer';
+        ws._mqttSubscribed = false;
+        ws._brokerUrl = brokerUrl;
+        cloudRelaySockets[index] = ws;
+
+        ws.onopen = () => {
+            if (ws._intentionalClose) return;
+            const clientId = `av88-${roomCode.toLowerCase()}-${state.role || 'p'}-${index}-${Math.random().toString(36).slice(2, 7)}`;
+            try {
+                ws.send(mqttBuildConnect(clientId));
+            } catch (e) {}
+        };
+
+        ws.onmessage = (event) => {
+            if (ws._intentionalClose || !event.data) return;
+            const bytes = new Uint8Array(event.data);
+            mqttParsePackets(
+                bytes,
+                (payload) => {
+                    handleIncomingTransportPayload(payload, 'relay');
+                },
+                () => {
+                    ws._mqttSubscribed = true;
+                    console.log(`[Relay] Conectat și abonat pe ${brokerUrl} -> ${topic}`);
+                    announcePresenceAndState();
+                },
+                () => {
+                    try {
+                        ws.send(mqttBuildSubscribe(topic));
+                    } catch (e) {}
+                }
+            );
+        };
+
+        ws.onerror = () => {};
+
+        ws.onclose = () => {
+            ws._mqttSubscribed = false;
+            if (ws._intentionalClose) return;
+            if (state.roomCode && state.roomCode.toUpperCase() === roomCode.toUpperCase() && state.phase !== 'MENU') {
+                setTimeout(() => {
+                    if (state.roomCode && state.roomCode.toUpperCase() === roomCode.toUpperCase() && state.phase !== 'MENU') {
+                        connectBroker(brokerUrl, index);
+                    }
+                }, 2500);
+            }
+        };
+    };
+
+    CLOUD_RELAY_BROKERS.forEach((url, idx) => connectBroker(url, idx));
+
+    // Keep-alive MQTT PINGREQ la fiecare 20s pentru a preveni închiderea conexiunii pe 4G/5G
+    cloudRelayPingTimer = setInterval(() => {
+        const pingReq = new Uint8Array([0xc0, 0x00]);
+        for (const ws of cloudRelaySockets) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try { ws.send(pingReq); } catch (e) {}
+            }
+        }
+    }, 20000);
+
+    // Beacon periodic de descoperire până când adversarul este conectat
+    discoveryBeaconTimer = setInterval(() => {
+        if (!state.roomCode || state.phase === 'MENU') return;
+        if (!state.opponentConnected) {
+            broadcastEvent('PLAYER_HELLO', {
+                playerName: state.playerName,
+                role: state.role,
+                variant: state.planeVariant,
+                count: state.planeCount
+            });
+        }
+    }, 2500);
+}
+
+function sendViaCloudRelay(payload) {
+    if (!state.roomCode) return false;
+    const topic = getRoomRelayTopic(state.roomCode);
+    let sentAny = false;
+    const packet = mqttBuildPublish(topic, payload);
+    for (const ws of cloudRelaySockets) {
+        if (ws && ws.readyState === WebSocket.OPEN && ws._mqttSubscribed) {
+            try {
+                ws.send(packet);
+                sentAny = true;
+            } catch (e) {}
+        }
+    }
+    return sentAny;
+}
+
+function announcePresenceAndState() {
+    broadcastEvent('PLAYER_HELLO', {
+        playerName: state.playerName,
+        role: state.role,
+        variant: state.planeVariant,
+        count: state.planeCount
+    });
+
+    if (state.myReady) {
+        broadcastEvent('PLAYER_READY', { playerName: state.playerName });
+    }
+
+    if (state.role === 'host') {
+        broadcastEvent('GAME_CONFIG', {
+            variant: state.planeVariant,
+            count: state.planeCount,
+            hostName: state.playerName
+        });
+        if (state.phase === 'BATTLE') {
+            broadcastEvent('SYNC_BATTLE_STATE', {
+                currentTurn: state.currentTurn,
+                hostShotsOnGuest: state.myShotsOnEnemy,
+                guestShotsOnHost: state.enemyShotsOnMe,
+                hostStats: state.stats,
+                planeCount: state.planeCount,
+                variant: state.planeVariant,
+                hostName: state.playerName,
+                guestName: state.opponentName
+            });
+        }
+    } else if (state.role === 'guest' && state.phase === 'BATTLE') {
+        broadcastEvent('REQUEST_BATTLE_SYNC');
+    }
+}
+
 let keepAliveTimer = null;
 let guestConnectTimer = null;
 let guestConnectAttempts = 0;
+let hostIdRetryCount = 0;
 
 function startKeepAliveHeartbeat() {
     if (keepAliveTimer) clearInterval(keepAliveTimer);
     keepAliveTimer = setInterval(() => {
-        if (state.activeConn && state.activeConn.open) {
-            try {
-                state.activeConn.send({ type: 'PING' });
-            } catch (e) {}
-        }
+        broadcastEvent('PING');
     }, 3500);
 }
 
@@ -315,6 +587,7 @@ function connectToRoom(code, role, isResuming = false) {
     state.role = role;
     state.isReconnecting = isResuming;
     state.opponentConnected = false;
+    hostIdRetryCount = 0;
 
     if (guestConnectTimer) {
         clearInterval(guestConnectTimer);
@@ -328,6 +601,11 @@ function connectToRoom(code, role, isResuming = false) {
     }
     saveMatchSession();
 
+    // 1. Pornește instantaneu Releul Cloud WSS (funcționează pe orice rețea 4G/5G/NAT din țară)
+    startCloudRelay(state.roomCode);
+    startKeepAliveHeartbeat();
+
+    // 2. Pornește în paralel conexiunea directă WebRTC P2P (PeerJS)
     if (state.activeConn) {
         try { state.activeConn.close(); } catch (e) {}
         state.activeConn = null;
@@ -340,51 +618,64 @@ function connectToRoom(code, role, isResuming = false) {
     const hostId = getHostPeerId(state.roomCode);
 
     if (role === 'host') {
-        state.peer = new Peer(hostId, PEER_CONFIG);
-
-        state.peer.on('open', (id) => {
-            console.log('Peer Host activat cu ID:', id);
-            hideReconnectBanner();
-            updateLobbyOpponentStatus();
-            updateSetupUI();
-        });
-
-        state.peer.on('connection', (conn) => {
-            console.log('Client nou conectat la Host:', conn.peer);
-            if (state.activeConn && state.activeConn !== conn) {
-                try { state.activeConn.close(); } catch (e) {}
-            }
-            setupConnection(conn);
-        });
-
-        state.peer.on('error', (err) => {
-            console.warn('Eroare Peer Host:', err);
-            if (err.type === 'unavailable-id') {
-                if (state.role === 'host') {
-                    const newCode = generateRoomCode();
-                    console.warn(`ID ${hostId} este ocupat pe server. Se alocă automat o cameră nouă: ${newCode}`);
-                    const disp = document.getElementById('display-room-code');
-                    if (disp) disp.textContent = newCode;
-                    connectToRoom(newCode, 'host');
-                }
-            } else if (err.type === 'disconnected' || err.type === 'network') {
-                showReconnectBanner();
-            }
-        });
-
-        state.peer.on('disconnected', () => {
-            showReconnectBanner();
+        const initHostPeer = () => {
+            if (state.role !== 'host' || !state.roomCode) return;
             if (state.peer && !state.peer.destroyed) {
-                state.peer.reconnect();
+                try { state.peer.destroy(); } catch (e) {}
             }
-        });
+            state.peer = new Peer(hostId, PEER_CONFIG);
+
+            state.peer.on('open', (id) => {
+                console.log('Peer Host activat cu ID:', id);
+                hideReconnectBanner();
+                updateLobbyOpponentStatus();
+                updateSetupUI();
+            });
+
+            state.peer.on('connection', (conn) => {
+                console.log('Client nou conectat la Host:', conn.peer);
+                if (state.activeConn && state.activeConn !== conn) {
+                    try { state.activeConn.close(); } catch (e) {}
+                }
+                setupConnection(conn);
+            });
+
+            state.peer.on('error', (err) => {
+                console.warn('Eroare Peer Host:', err);
+                if (err.type === 'unavailable-id') {
+                    // Nu schimba codul camerei (pentru a nu invalida link-ul deja trimis pe WhatsApp!).
+                    // Reîncearcă preluarea aceluiași ID; între timp Releul Cloud WSS este deja activ pe acest cod.
+                    hostIdRetryCount++;
+                    if (hostIdRetryCount <= 5) {
+                        setTimeout(() => {
+                            if (state.role === 'host' && (!state.peer || state.peer.destroyed || !state.peer.open)) {
+                                initHostPeer();
+                            }
+                        }, 3000);
+                    }
+                } else if ((err.type === 'disconnected' || err.type === 'network') && !isCloudRelayConnected()) {
+                    showReconnectBanner();
+                }
+            });
+
+            state.peer.on('disconnected', () => {
+                if (!isCloudRelayConnected()) {
+                    showReconnectBanner();
+                }
+                if (state.peer && !state.peer.destroyed) {
+                    try { state.peer.reconnect(); } catch (e) {}
+                }
+            });
+        };
+
+        initHostPeer();
 
     } else {
         const guestId = `av88-${state.roomCode.toLowerCase()}-g-${Date.now().toString(36)}`;
         state.peer = new Peer(guestId, PEER_CONFIG);
 
         const attemptGuestConnect = () => {
-            if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
+            if (!state.peer || state.peer.destroyed || state.role !== 'guest') {
                 if (guestConnectTimer) {
                     clearInterval(guestConnectTimer);
                     guestConnectTimer = null;
@@ -398,6 +689,15 @@ function connectToRoom(code, role, isResuming = false) {
                 }
                 return;
             }
+            // Dacă există o conexiune WebRTC în plină negociere ICE ('checking'), nu o întrerupe prematur!
+            if (state.activeConn && state.activeConn.peerConnection) {
+                const iceState = state.activeConn.peerConnection.iceConnectionState;
+                const connAge = Date.now() - (state.activeConn._createdAt || 0);
+                if ((iceState === 'checking' || iceState === 'connected' || iceState === 'completed') && connAge < 10000) {
+                    return;
+                }
+            }
+
             guestConnectAttempts++;
             console.log(`[P2P] Guest conectare la Host: ${hostId} (încercarea #${guestConnectAttempts})`);
 
@@ -409,7 +709,10 @@ function connectToRoom(code, role, isResuming = false) {
             const conn = state.peer.connect(hostId, {
                 reliable: true
             });
-            setupConnection(conn);
+            if (conn) {
+                conn._createdAt = Date.now();
+                setupConnection(conn);
+            }
         };
 
         state.peer.on('open', (id) => {
@@ -417,7 +720,7 @@ function connectToRoom(code, role, isResuming = false) {
             attemptGuestConnect();
             if (guestConnectTimer) clearInterval(guestConnectTimer);
             guestConnectTimer = setInterval(() => {
-                if (state.opponentConnected || !state.peer || state.peer.destroyed || state.role !== 'guest') {
+                if ((state.activeConn && state.activeConn.open) || !state.peer || state.peer.destroyed || state.role !== 'guest') {
                     clearInterval(guestConnectTimer);
                     guestConnectTimer = null;
                     return;
@@ -428,27 +731,29 @@ function connectToRoom(code, role, isResuming = false) {
                     clearInterval(guestConnectTimer);
                     guestConnectTimer = null;
                 }
-            }, 4500);
+            }, 6000);
         });
 
         state.peer.on('error', (err) => {
             console.warn('Eroare Peer Guest:', err);
             if (err.type === 'peer-unavailable') {
-                console.log('Gazda nu este încă online pe PeerJS, reîncercare în 2.5s...');
+                console.log('Gazda nu este încă pe P2P direct, reîncercare în 3.5s (Releul Cloud WSS este activ)...');
                 setTimeout(() => {
-                    if (!state.opponentConnected && state.peer && !state.peer.destroyed) {
+                    if ((!state.activeConn || !state.activeConn.open) && state.peer && !state.peer.destroyed) {
                         attemptGuestConnect();
                     }
-                }, 2500);
-            } else if (err.type === 'disconnected' || err.type === 'network') {
+                }, 3500);
+            } else if ((err.type === 'disconnected' || err.type === 'network') && !isCloudRelayConnected()) {
                 showReconnectBanner();
             }
         });
 
         state.peer.on('disconnected', () => {
-            showReconnectBanner();
+            if (!isCloudRelayConnected()) {
+                showReconnectBanner();
+            }
             if (state.peer && !state.peer.destroyed) {
-                state.peer.reconnect();
+                try { state.peer.reconnect(); } catch (e) {}
             }
         });
     }
@@ -462,6 +767,7 @@ function setupConnection(conn) {
         if (state.activeConn !== conn) return;
         console.log('Conexiune WebRTC P2P Deschisă cu succes!');
         state.opponentConnected = true;
+        lastOpponentSeenAt = Date.now();
         if (guestConnectTimer) {
             clearInterval(guestConnectTimer);
             guestConnectTimer = null;
@@ -473,37 +779,7 @@ function setupConnection(conn) {
         updateSetupUI();
         saveMatchSession();
 
-        // Trimite identitatea și starea curentă
-        broadcastEvent('PLAYER_HELLO', {
-            playerName: state.playerName,
-            role: state.role,
-            variant: state.planeVariant,
-            count: state.planeCount
-        });
-
-        if (state.myReady) {
-            broadcastEvent('PLAYER_READY', { playerName: state.playerName });
-        }
-
-        if (state.role === 'host') {
-            broadcastEvent('GAME_CONFIG', {
-                variant: state.planeVariant,
-                count: state.planeCount,
-                hostName: state.playerName
-            });
-            if (state.phase === 'BATTLE') {
-                broadcastEvent('SYNC_BATTLE_STATE', {
-                    currentTurn: state.currentTurn,
-                    hostShotsOnGuest: state.myShotsOnEnemy,
-                    guestShotsOnHost: state.enemyShotsOnMe,
-                    hostStats: state.stats,
-                    planeCount: state.planeCount,
-                    variant: state.planeVariant,
-                    hostName: state.playerName,
-                    guestName: state.opponentName
-                });
-            }
-        }
+        announcePresenceAndState();
     };
 
     if (conn.open) {
@@ -513,14 +789,17 @@ function setupConnection(conn) {
     }
 
     conn.on('data', (data) => {
-        handleBroadcastEvent(data);
+        handleIncomingTransportPayload(data, 'p2p');
     });
 
     conn.on('close', () => {
         if (state.activeConn && state.activeConn !== conn) return;
-        console.log('Conexiunea WebRTC cu adversarul s-a întrerupt');
+        console.log('Conexiunea WebRTC P2P directă s-a închis');
+        // Dacă Releul Cloud WSS este activ și am primit semnal recent de la adversar, păstrăm sesiunea activă fără întrerupere!
+        if (isCloudRelayConnected() && (Date.now() - lastOpponentSeenAt < 15000)) {
+            return;
+        }
         state.opponentConnected = false;
-        stopKeepAliveHeartbeat();
         updateLobbyOpponentStatus();
         updateSetupUI();
         if (state.phase === 'BATTLE') {
@@ -534,19 +813,57 @@ function setupConnection(conn) {
 }
 
 function broadcastEvent(type, data = {}) {
-    if (!state.activeConn || !state.activeConn.open) {
-        console.warn('WebRTC nu este conectat pentru a trimite:', type);
-        return;
+    const payload = {
+        type,
+        sender: state.role,
+        senderInstanceId: MY_INSTANCE_ID,
+        _mid: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        ...data
+    };
+
+    let sentP2P = false;
+    if (state.activeConn && state.activeConn.open) {
+        try {
+            state.activeConn.send(payload);
+            sentP2P = true;
+        } catch (e) {
+            console.warn('Eroare la trimiterea mesajului P2P:', e);
+        }
     }
-    try {
-        state.activeConn.send({
-            type,
-            sender: state.role,
-            ...data
-        });
-    } catch (e) {
-        console.warn("Eroare la trimiterea mesajului P2P:", e);
+
+    const sentRelay = sendViaCloudRelay(payload);
+
+    if (!sentP2P && !sentRelay && type !== 'PING' && type !== 'PLAYER_HELLO') {
+        console.warn('Niciun canal (P2P / Cloud Relay) nu este încă deschis pentru:', type);
     }
+}
+
+function handleIncomingTransportPayload(payload, source) {
+    if (!payload || !payload.type) return;
+
+    // Ignoră propriile mesaje reflectate prin topicul MQTT
+    if (payload.senderInstanceId && payload.senderInstanceId === MY_INSTANCE_ID) return;
+    if (payload.sender && state.role && payload.sender === state.role) return;
+
+    // Deduplicare: dacă același mesaj vine atât prin P2P cât și prin Cloud Relay, îl procesăm o singură dată
+    if (payload._mid) {
+        if (seenMessageIds.has(payload._mid)) return;
+        seenMessageIds.add(payload._mid);
+        if (seenMessageIds.size > 500) {
+            const firstKey = seenMessageIds.values().next().value;
+            seenMessageIds.delete(firstKey);
+        }
+    }
+
+    lastOpponentSeenAt = Date.now();
+    if (!state.opponentConnected) {
+        state.opponentConnected = true;
+        hideReconnectBanner();
+        updateLobbyOpponentStatus();
+        updateSetupUI();
+    }
+
+    handleBroadcastEvent(payload);
 }
 
 function handleBroadcastEvent(payload) {
@@ -554,9 +871,7 @@ function handleBroadcastEvent(payload) {
 
     switch (payload.type) {
         case 'PING':
-            if (state.activeConn && state.activeConn.open) {
-                try { state.activeConn.send({ type: 'PONG' }); } catch (e) {}
-            }
+            broadcastEvent('PONG');
             break;
 
         case 'PONG':
@@ -1834,11 +2149,7 @@ function createRoomAndInvite(pilotName) {
     state.planeCount = count;
 
     // Generare cod de cameră
-    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 4; i++) {
-        code += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
+    const code = generateRoomCode();
 
     document.getElementById('display-room-code').textContent = code;
     connectToRoom(code, 'host');
@@ -2372,24 +2683,49 @@ document.addEventListener('DOMContentLoaded', () => {
     initDeductionControls();
 });
 
-// Salvare stare la închiderea paginii și eliberare conexiune PeerJS
+// Reconectare automată când jucătorul revine în browser din WhatsApp / SMS / Background
+function handleAppForegroundResume() {
+    if (!state.roomCode || state.phase === 'MENU') return;
+
+    // 1. Verifică și repornește Releul Cloud WSS dacă sistemul de operare mobil a închis socketul în background
+    if (!isCloudRelayConnected()) {
+        startCloudRelay(state.roomCode);
+    }
+
+    // 2. Verifică starea PeerJS
+    if (state.peer && state.peer.disconnected && !state.peer.destroyed) {
+        try {
+            state.peer.reconnect();
+        } catch (e) {}
+    }
+
+    // 3. Re-anunță prezența în cameră și sincronizează starea
+    announcePresenceAndState();
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        handleAppForegroundResume();
+    } else {
+        saveMatchSession();
+    }
+});
+
+window.addEventListener('focus', () => {
+    handleAppForegroundResume();
+});
+
+window.addEventListener('online', () => {
+    handleAppForegroundResume();
+});
+
+// Salvare stare la închiderea paginii
 window.addEventListener('beforeunload', () => {
     saveMatchSession();
-    if (state.activeConn) {
-        try { state.activeConn.close(); } catch (e) {}
-    }
-    if (state.peer) {
-        try { state.peer.destroy(); } catch (e) {}
-    }
 });
 
 window.addEventListener('pagehide', () => {
     saveMatchSession();
-    if (state.activeConn) {
-        try { state.activeConn.close(); } catch (e) {}
-    }
-    if (state.peer) {
-        try { state.peer.destroy(); } catch (e) {}
-    }
 });
+
 
