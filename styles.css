@@ -1361,15 +1361,169 @@ body.light-theme #btn-reset-draft {
 }
 
 .turn-banner {
+    position: sticky;
+    top: 8px;
+    z-index: 60;
     background: var(--neo-surface);
-    border: 1px solid var(--neo-border);
-    box-shadow: var(--neo-raised-shadow-sm);
-    padding: 10px 20px;
-    border-radius: 26px;
-    font-size: 15px;
+    border: 2px solid var(--neo-border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), var(--neo-raised-shadow-sm);
+    padding: 12px 20px;
+    border-radius: 20px;
+    font-size: 16px;
     text-align: center;
     width: 100%;
     max-width: 480px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.25s ease;
+}
+
+.turn-banner.turn-my-turn {
+    border-color: var(--neon-cyan);
+    background: linear-gradient(135deg, rgba(0, 245, 212, 0.16) 0%, var(--neo-surface) 100%);
+    box-shadow: 0 0 22px rgba(0, 245, 212, 0.28), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.turn-banner.turn-enemy-turn {
+    border-color: var(--neon-gold);
+    background: linear-gradient(135deg, rgba(255, 183, 3, 0.15) 0%, var(--neo-surface) 100%);
+    box-shadow: 0 0 18px rgba(255, 183, 3, 0.22), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Modal Tactic Anunț Tură (Turn Announce Modal) */
+.turn-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(6, 12, 22, 0.68);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: turnModalFadeIn 0.18s ease-out;
+}
+
+.turn-modal-overlay.hidden {
+    display: none !important;
+}
+
+.turn-modal-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--neo-surface);
+    border-radius: 24px;
+    padding: 24px 20px 20px;
+    text-align: center;
+    border: 2.5px solid var(--neon-cyan);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 35px rgba(0, 245, 212, 0.35);
+    animation: turnCardPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.turn-modal-card.my-turn {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 38px rgba(0, 245, 212, 0.4);
+}
+
+.turn-modal-card.enemy-turn {
+    border-color: var(--neon-gold);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 38px rgba(255, 183, 3, 0.35);
+}
+
+.turn-modal-icon {
+    font-size: 46px;
+    line-height: 1;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.turn-modal-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    background: rgba(0, 245, 212, 0.18);
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+}
+
+.turn-modal-card.enemy-turn .turn-modal-badge {
+    background: rgba(255, 183, 3, 0.18);
+    color: var(--neon-gold);
+    border-color: var(--neon-gold);
+}
+
+.turn-modal-title {
+    margin: 0 0 8px 0;
+    font-size: 25px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+}
+
+.turn-modal-card.my-turn .turn-modal-title {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 16px rgba(0, 245, 212, 0.45);
+}
+
+.turn-modal-card.enemy-turn .turn-modal-title {
+    color: var(--neon-gold);
+    text-shadow: 0 0 16px rgba(255, 183, 3, 0.4);
+}
+
+.turn-modal-subtitle {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.turn-modal-btn {
+    width: 100%;
+    padding: 12px 18px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    background: var(--neon-cyan);
+    color: #06121e;
+    box-shadow: 0 4px 16px rgba(0, 245, 212, 0.35);
+    transition: transform 0.12s ease;
+}
+
+.turn-modal-card.enemy-turn .turn-modal-btn {
+    background: var(--neon-gold);
+    color: #1a1100;
+    box-shadow: 0 4px 16px rgba(255, 183, 3, 0.35);
+}
+
+.turn-modal-btn:active {
+    transform: scale(0.97);
+}
+
+@keyframes turnModalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes turnCardPopIn {
+    from {
+        opacity: 0;
+        transform: scale(0.86) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 /* ========================================================

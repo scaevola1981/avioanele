@@ -1139,6 +1139,7 @@ function handleIncomingShot(cellIndex) {
         renderAttackGrid();
         updateCombatStatusUI();
         saveMatchSession();
+        showTurnModal(true, `${state.lastCombatMessage}<br><b style="color: var(--neon-cyan)">Acum este rândul tău să ataci!</b>`, 2100);
     }
 }
 
@@ -1193,6 +1194,8 @@ function handleShotResultReceived(payload) {
         renderDefenseGrid();
         updateCombatStatusUI();
         saveMatchSession();
+        const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+        showTurnModal(false, `${state.lastCombatMessage}<br><span style="color: var(--text-muted)">Urmează lovitura lui <b>${oppName}</b>...</span>`, 1900);
     }
 }
 
@@ -1569,6 +1572,14 @@ function startCombatPhase() {
     updateCombatStatusUI();
     updateDeductionControlsUI();
     saveMatchSession();
+
+    const isMyTurn = state.currentTurn === state.role;
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+    if (isMyTurn) {
+        showTurnModal(true, `Lupta a început! Alege o căsuță pe <b>🎯 RADAR ATAC</b> pentru prima lovitură!`, 2400);
+    } else {
+        showTurnModal(false, `Lupta a început! <b>${oppName}</b> execută prima lovitură...`, 2200);
+    }
 }
 
 function renderAttackGrid() {
@@ -1923,16 +1934,77 @@ function renderDefenseGrid() {
     }
 }
 
+let turnModalTimer = null;
+
+function hideTurnModal() {
+    const modal = document.getElementById('turn-announce-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    if (turnModalTimer) {
+        clearTimeout(turnModalTimer);
+        turnModalTimer = null;
+    }
+}
+
+function showTurnModal(isMyTurn, customSubtitle = '', durationMs = 2000) {
+    const modal = document.getElementById('turn-announce-modal');
+    const card = document.getElementById('turn-modal-card');
+    const icon = document.getElementById('turn-modal-icon');
+    const badge = document.getElementById('turn-modal-badge');
+    const title = document.getElementById('turn-modal-title');
+    const subtitle = document.getElementById('turn-modal-subtitle');
+    const btn = document.getElementById('btn-dismiss-turn-modal');
+
+    if (!modal || !card) return;
+
+    const myName = state.playerName || 'Tu';
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+
+    if (isMyTurn) {
+        card.classList.remove('enemy-turn');
+        card.classList.add('my-turn');
+        if (icon) icon.textContent = '🎯';
+        if (badge) badge.textContent = '🟢 EȘTI LA RÂND';
+        if (title) title.textContent = `RÂNDUL TĂU (${myName})!`;
+        if (subtitle) {
+            subtitle.innerHTML = customSubtitle || `Atinge o căsuță pe <b>🎯 RADAR ATAC</b> pentru a lansa racheta!`;
+        }
+        if (btn) btn.textContent = '⚔️ ATACĂ ACUM';
+    } else {
+        card.classList.remove('my-turn');
+        card.classList.add('enemy-turn');
+        if (icon) icon.textContent = '⏳';
+        if (badge) badge.textContent = '🟠 RÂNDUL INAMICULUI';
+        if (title) title.textContent = `TRAGE ${oppName}!`;
+        if (subtitle) {
+            subtitle.innerHTML = customSubtitle || `Așteaptă lovitura lui <b>${oppName}</b>...`;
+        }
+        if (btn) btn.textContent = 'AM ÎNȚELES';
+    }
+
+    modal.classList.remove('hidden');
+
+    if (turnModalTimer) {
+        clearTimeout(turnModalTimer);
+    }
+    turnModalTimer = setTimeout(() => {
+        hideTurnModal();
+    }, durationMs);
+}
+
 function fireAtEnemy(cellIndex) {
     if (state.currentTurn !== state.role) {
         soundFX.playRadarPing();
         const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
         state.lastCombatMessage = `⏳ Rândul lui <b>${oppName}</b>! Așteaptă lovitura adversarului...`;
         updateCombatStatusUI();
+        showTurnModal(false, `Nu este încă rândul tău!<br>Așteaptă ca <b>${oppName}</b> să își execute lovitura.`, 1800);
         return;
     }
     if (state.myShotsOnEnemy[cellIndex]) return; // Deja s-a tras aici
 
+    hideTurnModal();
     soundFX.playShotLaunch();
 
     const coord = getCoordinateLabel(cellIndex);
@@ -1959,8 +2031,8 @@ function updateCombatStatusUI() {
     updatePlayerNamesUI();
 
     let turnText = isMyTurn 
-        ? `🎯 <span style="color: var(--neon-cyan); font-weight: bold;">RÂNDUL TĂU (${myName})! Atinge o căsuță pe RADAR ATAC</span>`
-        : `🛡️ <span style="color: var(--neon-amber)">Rândul lui ${oppName}... Se pregătește să tragă</span>`;
+        ? `🟢 🎯 <span style="color: var(--neon-cyan); font-weight: 800; font-size: 16px;">RÂNDUL TĂU (${myName})! Atinge pe RADAR ATAC</span>`
+        : `🟠 ⏳ <span style="color: var(--neon-gold); font-weight: 800; font-size: 16px;">RÂNDUL LUI ${oppName.toUpperCase()} — Așteaptă să tragă...</span>`;
 
     if (state.lastCombatMessage) {
         turnIndicator.innerHTML = `<div>${turnText}</div><div style="font-size: 13px; margin-top: 5px; color: var(--text-muted);">${state.lastCombatMessage}</div>`;
@@ -1969,9 +2041,11 @@ function updateCombatStatusUI() {
     }
 
     if (isMyTurn) {
-        turnIndicator.classList.add('pulse-ready');
+        turnIndicator.classList.add('pulse-ready', 'turn-my-turn');
+        turnIndicator.classList.remove('turn-enemy-turn');
     } else {
-        turnIndicator.classList.remove('pulse-ready');
+        turnIndicator.classList.remove('pulse-ready', 'turn-my-turn');
+        turnIndicator.classList.add('turn-enemy-turn');
     }
 
     // Actualizează contoarele de avioane
@@ -1982,6 +2056,7 @@ function updateCombatStatusUI() {
 }
 
 function endGame(won) {
+    hideTurnModal();
     state.phase = 'GAMEOVER';
     clearMatchSession();
     showScreen('gameover-modal');
@@ -2681,6 +2756,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 15. Controale deducere tactică pe radarul de atac
     initDeductionControls();
+
+    // 16. Închidere rapidă la atingere pentru Modalul de Anunț Tură
+    const turnModalOverlay = document.getElementById('turn-announce-modal');
+    if (turnModalOverlay) {
+        turnModalOverlay.addEventListener('click', () => {
+            hideTurnModal();
+        });
+    }
 });
 
 // Reconectare automată când jucătorul revine în browser din WhatsApp / SMS / Background
