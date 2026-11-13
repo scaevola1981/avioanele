@@ -21,8 +21,8 @@
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=25) -->
-    <link rel="stylesheet" href="styles.css?v=25">
+    <!-- Design & Fonturi (cu cache-busting v=26) -->
+    <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
 
@@ -33,6 +33,7 @@
             <h1 class="app-title">AVIOANE 8x8</h1>
         </div>
         <div class="header-actions">
+            <button id="btn-leave-match" class="btn-icon hidden" title="Părăsește Meciul" aria-label="Părăsește meciul" style="color: var(--neon-crimson); font-size: 16px;">🚪</button>
             <button id="btn-toggle-theme" class="btn-icon" title="Comută Temă (Dark / Light)" aria-label="Comută tema">🌙</button>
             <button id="btn-toggle-sound" class="btn-icon" title="Sunet Pornit/Oprit" aria-label="Comută sunetul">🔊</button>
         </div>
@@ -483,16 +484,32 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=25) -->
+    <!-- ========================================================
+         MODAL: ADVERSARUL A PĂRĂSIT MECIUL
+         ======================================================== -->
+    <div id="opponent-left-modal" class="app-modal hidden">
+        <div class="modal-content neo-card" style="max-width: 380px; text-align: center;">
+            <div style="font-size: 42px; margin-bottom: 8px;">⚠️</div>
+            <h2 class="modal-title" style="color: var(--neon-gold); font-size: 21px;">Meci Întrerupt</h2>
+            <p id="opponent-left-message" style="color: var(--text-muted); font-size: 14px; margin: 10px 0 20px 0; line-height: 1.5;">
+                Adversarul a părăsit meciul sau a ieșit în meniu.
+            </p>
+            <button id="btn-opponent-left-menu" class="btn-primary" style="width: 100%;">
+                🏠 ÎNAPOI ÎN MENIU
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=26) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=25"></script>
-    <script src="game.js?v=25"></script>
+    <script src="sound.js?v=26"></script>
+    <script src="game.js?v=26"></script>
 
     <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=25')
+                navigator.serviceWorker.register('./sw.js?v=26')
                     .then(reg => {
                         console.log('ServiceWorker PWA activat:', reg.scope);
                         reg.update();

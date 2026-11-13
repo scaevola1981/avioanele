@@ -1,0 +1,19 @@
+{
+  "name": "avioanele-joc",
+  "version": "1.0.0",
+  "description": "Jocul de Avioane 8x8 (Multiplayer Online)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "avioane",
+    "webrtc",
+    "p2p",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

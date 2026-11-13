@@ -198,6 +198,99 @@ function clearMatchSession() {
     localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
+function cleanUrlRoomParam() {
+    try {
+        if (window.history && window.history.replaceState) {
+            const cleanUrl = window.location.pathname + (window.location.hash || '');
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+    } catch (e) {}
+}
+
+function resetMatchData() {
+    state.previewHead = null;
+    state.previewValidOrientations = [];
+    state.myPlanes = [];
+    state.activePlaneIndex = null;
+    state.myReady = false;
+    state.opponentReady = false;
+    state.myShotsOnEnemy = {};
+    state.enemyShotsOnMe = {};
+    state.myDeductionsOnEnemy = [];
+    if (state.draftDeductionCells) state.draftDeductionCells.clear();
+    state.isDeductionMode = false;
+    state.lastCombatMessage = '';
+    state.currentTurn = 'host';
+    state.stats = {
+        myHits: 0,
+        myMisses: 0,
+        enemyDownedPlanes: 0,
+        myDownedPlanes: 0
+    };
+
+    const readyBtn = document.getElementById('btn-ready-fleet');
+    if (readyBtn) {
+        readyBtn.disabled = true;
+        readyBtn.textContent = 'GATA DE LUPTĂ';
+    }
+
+    const toggleDeductionBtn = document.getElementById('btn-toggle-deduction-mode');
+    if (toggleDeductionBtn) {
+        toggleDeductionBtn.classList.remove('active-mode', 'pulse-ready');
+        toggleDeductionBtn.textContent = '✏️ DESENEAZĂ CONTUR AVION';
+    }
+    const deductionPanel = document.getElementById('combat-deduction-panel');
+    if (deductionPanel) deductionPanel.classList.add('hidden');
+}
+
+function leaveMatchAndGoToMenu() {
+    clearMatchSession();
+    resetMatchData();
+    state.phase = 'MENU';
+    state.roomCode = '';
+    state.role = null;
+    state.opponentConnected = false;
+
+    stopKeepAliveHeartbeat();
+    stopCloudRelay();
+    hideReconnectBanner();
+    hideTurnModal();
+
+    if (state.activeConn) {
+        try { state.activeConn.close(); } catch (e) {}
+        state.activeConn = null;
+    }
+    if (state.peer) {
+        try { state.peer.destroy(); } catch (e) {}
+        state.peer = null;
+    }
+
+    cleanUrlRoomParam();
+
+    document.querySelectorAll('.app-modal').forEach(m => m.classList.add('hidden'));
+
+    showScreen('menu-screen');
+    renderRecentOpponentsUI();
+}
+
+function handleOpponentLeft() {
+    soundFX.playRadarPing();
+    clearMatchSession();
+    resetMatchData();
+    hideTurnModal();
+    hideReconnectBanner();
+
+    const modal = document.getElementById('opponent-left-modal');
+    const msgEl = document.getElementById('opponent-left-message');
+    const oppName = state.opponentName && state.opponentName !== 'Adversar' ? state.opponentName : 'Adversarul';
+    if (msgEl) {
+        msgEl.innerHTML = `Pilotul <b>${oppName}</b> a părăsit meciul sau a ieșit în meniu.<br>Misiunea curentă a fost încheiată.`;
+    }
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
 function getActiveSession() {
     try {
         const raw = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -990,6 +1083,10 @@ function handleBroadcastEvent(payload) {
         case 'REMATCH_ACCEPTED':
             resetGameForRematch();
             break;
+
+        case 'PLAYER_LEFT':
+            handleOpponentLeft();
+            break;
     }
 }
 
@@ -1029,6 +1126,7 @@ function hideReconnectBanner() {
 // ==========================================
 
 function onConnectedToRoom() {
+    resetMatchData();
     state.phase = 'SETUP';
     showScreen('setup-screen');
     renderSetupGrid();
@@ -1245,6 +1343,15 @@ function showScreen(screenId) {
     const target = document.getElementById(screenId);
     if (target) {
         target.classList.remove('hidden');
+    }
+
+    const leaveBtn = document.getElementById('btn-leave-match');
+    if (leaveBtn) {
+        if (screenId === 'setup-screen' || screenId === 'combat-screen') {
+            leaveBtn.classList.remove('hidden');
+        } else {
+            leaveBtn.classList.add('hidden');
+        }
     }
 }
 
@@ -2469,6 +2576,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inviteModal) {
             inviteModal.classList.remove('hidden');
         }
+
+        // Curăță imediat URL-ul din bara browserului/PWA pentru a preveni blocarea pe vechea cameră la reload viitor!
+        cleanUrlRoomParam();
     }
 
     // 2.1 Butonul JOACĂ din modalul de invitație
@@ -2476,6 +2586,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnModalPlay) {
         btnModalPlay.addEventListener('click', () => {
             soundFX.playClick();
+            clearMatchSession();
+            resetMatchData();
+            const resumeBanner = document.getElementById('resume-session-banner');
+            if (resumeBanner) resumeBanner.classList.add('hidden');
+
             const guestInput = document.getElementById('input-modal-guest-name');
             const enteredName = guestInput ? guestInput.value.trim() : '';
             const finalName = enteredName || ('Pilot ' + Math.floor(100 + Math.random() * 900));
@@ -2565,6 +2680,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. Creare Cameră (Host)
     document.getElementById('btn-create-room').addEventListener('click', () => {
         soundFX.playClick();
+        clearMatchSession();
+        resetMatchData();
+        const resumeBanner = document.getElementById('resume-session-banner');
+        if (resumeBanner) resumeBanner.classList.add('hidden');
+
         const pilotInput = document.getElementById('input-pilot-name');
         const nameVal = pilotInput ? pilotInput.value.trim() : '';
         const finalName = nameVal || ('Comandant ' + Math.floor(100 + Math.random() * 900));
@@ -2600,6 +2720,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 6. Alăturare Cameră directă (Guest)
     document.getElementById('btn-join-room').addEventListener('click', () => {
         soundFX.playClick();
+        clearMatchSession();
+        resetMatchData();
+        const resumeBanner = document.getElementById('resume-session-banner');
+        if (resumeBanner) resumeBanner.classList.add('hidden');
+
         const pilotInput = document.getElementById('input-pilot-name');
         const nameVal = pilotInput ? pilotInput.value.trim() : '';
         const finalName = nameVal || ('Pilot ' + Math.floor(100 + Math.random() * 900));
@@ -2738,9 +2863,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-exit-to-menu').addEventListener('click', () => {
-        clearMatchSession();
-        window.location.href = window.location.pathname;
+        soundFX.playClick();
+        leaveMatchAndGoToMenu();
     });
+
+    // 13. Buton Părăsire Meci din Header (Leave Match)
+    const btnLeaveMatch = document.getElementById('btn-leave-match');
+    if (btnLeaveMatch) {
+        btnLeaveMatch.addEventListener('click', () => {
+            soundFX.playClick();
+            const confirmLeave = confirm('Sigur vrei să părăsești această misiune și să te întorci în meniul principal?');
+            if (confirmLeave) {
+                broadcastEvent('PLAYER_LEFT');
+                leaveMatchAndGoToMenu();
+            }
+        });
+    }
+
+    // Buton Revenire la Meniu din Modalul de Adversar Ieșit
+    const btnOpponentLeftMenu = document.getElementById('btn-opponent-left-menu');
+    if (btnOpponentLeftMenu) {
+        btnOpponentLeftMenu.addEventListener('click', () => {
+            soundFX.playClick();
+            leaveMatchAndGoToMenu();
+        });
+    }
 
     // 14. Buton Sunet Mute/Unmute
     const soundBtn = document.getElementById('btn-toggle-sound');
