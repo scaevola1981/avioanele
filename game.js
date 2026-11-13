@@ -296,9 +296,13 @@ function getActiveSession() {
         const raw = localStorage.getItem(SESSION_STORAGE_KEY);
         if (!raw) return null;
         const session = JSON.parse(raw);
-        // Validă timp de 12 ore
-        if (Date.now() - session.timestamp < 12 * 60 * 60 * 1000) {
+        if (!session.roomCode || !session.phase || session.phase === 'MENU') return null;
+        // Dacă meciul era doar în stadiul de SETUP (fără luptă), expiră după 10 minute pentru a nu agăța coduri vechi
+        const maxAge = session.phase === 'SETUP' ? (10 * 60 * 1000) : (45 * 60 * 1000);
+        if (Date.now() - session.timestamp < maxAge) {
             return session;
+        } else {
+            clearMatchSession();
         }
     } catch (e) {
         console.warn(e);
@@ -376,7 +380,8 @@ const PEER_CONFIG = {
 // ==========================================
 const CLOUD_RELAY_BROKERS = [
     'wss://broker.emqx.io:8084/mqtt',
-    'wss://broker.hivemq.com:8884/mqtt'
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt'
 ];
 
 const MY_INSTANCE_ID = `av88-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -483,6 +488,18 @@ function isCloudRelayConnected() {
     return cloudRelaySockets.some(s => s && s.readyState === WebSocket.OPEN && s._mqttSubscribed);
 }
 
+function updateCloudRelayUI() {
+    const el = document.getElementById('cloud-relay-indicator');
+    if (!el) return;
+    if (isCloudRelayConnected()) {
+        el.textContent = '🟢 Releu Cloud Activ';
+        el.className = 'relay-status-pill online';
+    } else {
+        el.textContent = '🟡 Conectare Releu...';
+        el.className = 'relay-status-pill connecting';
+    }
+}
+
 function stopCloudRelay() {
     if (cloudRelayPingTimer) {
         clearInterval(cloudRelayPingTimer);
@@ -499,6 +516,7 @@ function stopCloudRelay() {
         }
     }
     cloudRelaySockets = [];
+    updateCloudRelayUI();
 }
 
 function startCloudRelay(roomCode) {
@@ -540,6 +558,7 @@ function startCloudRelay(roomCode) {
                 () => {
                     ws._mqttSubscribed = true;
                     console.log(`[Relay] Conectat și abonat pe ${brokerUrl} -> ${topic}`);
+                    updateCloudRelayUI();
                     announcePresenceAndState();
                 },
                 () => {
@@ -554,6 +573,7 @@ function startCloudRelay(roomCode) {
 
         ws.onclose = () => {
             ws._mqttSubscribed = false;
+            updateCloudRelayUI();
             if (ws._intentionalClose) return;
             if (state.roomCode && state.roomCode.toUpperCase() === roomCode.toUpperCase() && state.phase !== 'MENU') {
                 setTimeout(() => {
@@ -1132,6 +1152,7 @@ function onConnectedToRoom() {
     renderSetupGrid();
     updatePlayerNamesUI();
     updateSetupUI();
+    updateCloudRelayUI();
     saveMatchSession();
 
     if (state.role === 'host') {
@@ -2611,6 +2632,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Închidere / Renunțare la Modalul de Invitație (X sau text)
+    const closeInviteModal = () => {
+        soundFX.playClick();
+        const inviteModal = document.getElementById('invite-welcome-modal');
+        if (inviteModal) inviteModal.classList.add('hidden');
+        cleanUrlRoomParam();
+        const codeInput = document.getElementById('input-join-room-code');
+        if (codeInput) codeInput.value = '';
+    };
+    const btnCloseInvite = document.getElementById('btn-close-invite-modal');
+    if (btnCloseInvite) btnCloseInvite.addEventListener('click', closeInviteModal);
+    const btnCancelInvite = document.getElementById('btn-modal-cancel');
+    if (btnCancelInvite) btnCancelInvite.addEventListener('click', closeInviteModal);
+
     // 2.2 Butoane DESCARCĂ APLICAȚIA (Banner Meniu & Modal)
     const btnMenuDownload = document.getElementById('btn-menu-download-app');
     if (btnMenuDownload) {
@@ -2730,6 +2765,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalName = nameVal || ('Pilot ' + Math.floor(100 + Math.random() * 900));
         state.playerName = finalName;
         localStorage.setItem('pilot_name', finalName);
+        initPilotSignaling(finalName);
 
         const codeInput = document.getElementById('input-join-room-code').value.trim().toUpperCase();
         if (codeInput.length < 3) {
@@ -2737,19 +2773,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Deschide modalul de confirmare / invitație la joc ca Oaspete
-        const inviteModal = document.getElementById('invite-welcome-modal');
-        const inviteRoomDisplay = document.getElementById('invite-room-display');
-        const guestInput = document.getElementById('input-modal-guest-name');
-        if (inviteRoomDisplay) inviteRoomDisplay.textContent = codeInput;
-        if (guestInput) guestInput.value = finalName;
-
-        if (inviteModal) {
-            inviteModal.classList.remove('hidden');
-        } else {
-            document.getElementById('display-room-code').textContent = codeInput;
-            connectToRoom(codeInput, 'guest');
-        }
+        // Conectare DIRECTĂ fără pop-up-uri intermediare derutante
+        document.getElementById('display-room-code').textContent = codeInput;
+        cleanUrlRoomParam();
+        connectToRoom(codeInput, 'guest');
     });
 
     // 7. Copiere link cameră

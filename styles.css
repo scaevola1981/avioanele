@@ -1604,6 +1604,54 @@ body.light-theme .app-modal {
     text-align: center;
     gap: 14px;
     animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.modal-close-corner {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.modal-close-corner:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.relay-status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.relay-status-pill.online {
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.3);
+}
+
+.relay-status-pill.connecting {
+    color: var(--neon-amber);
+    border-color: rgba(255, 170, 0, 0.3);
 }
 
 .modal-title {

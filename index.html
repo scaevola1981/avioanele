@@ -21,8 +21,8 @@
     <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     
-    <!-- Design & Fonturi (cu cache-busting v=26) -->
-    <link rel="stylesheet" href="styles.css?v=26">
+    <!-- Design & Fonturi (cu cache-busting v=27) -->
+    <link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 
@@ -126,6 +126,10 @@
             <h2 class="menu-section-title"><span>👥</span> Piloți cu care ai mai luptat</h2>
             <div id="recent-opponents-list" class="recent-pilots-list"></div>
         </div>
+        <!-- Versiune și stare rețea -->
+        <div style="margin-top: 18px; font-size: 11px; color: var(--text-muted); opacity: 0.7; text-align: center; letter-spacing: 0.5px;">
+            Avioanele v27 • P2P WebRTC & Releu Cloud
+        </div>
     </main>
 
     <!-- ========================================================
@@ -152,6 +156,9 @@
                 <div>
                     <div id="room-role-tag" style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">👑 GAZDA CAMEREI</div>
                     <span id="display-room-code" class="room-code-tag">----</span>
+                    <div style="margin-top: 4px;">
+                        <span id="cloud-relay-indicator" class="relay-status-pill connecting" title="Stare Releu Conexiune Cloud">🟡 Conectare Releu...</span>
+                    </div>
                 </div>
                 <div id="host-actions-container" style="display: flex; gap: 8px;">
                     <button id="btn-invite-opponent" class="btn-primary" style="margin: 0; width: auto; font-size: 13px; padding: 8px 14px;">📤 INVITĂ</button>
@@ -362,7 +369,8 @@
          3. NUMELE (folosit pentru ca celălalt jucător să știe numele celuilalt)
          ======================================================== -->
     <div id="invite-welcome-modal" class="app-modal hidden">
-        <div class="modal-content neo-card" style="max-width: 420px;">
+        <div class="modal-content neo-card" style="max-width: 420px; position: relative;">
+            <button id="btn-close-invite-modal" class="modal-close-corner" title="Închide" aria-label="Închide">✕</button>
             <div class="invite-header">
                 <span class="invite-icon">✈️</span>
                 <h2 class="modal-title" style="margin-top: 4px; font-size: 21px;">Invitație la Luptă!</h2>
@@ -390,6 +398,11 @@
             <!-- 2. BUTONUL DESCARCĂ APLICAȚIA -->
             <button id="btn-modal-download-app" class="btn-secondary" style="margin-bottom: 6px;">
                 📥 DESCARCĂ APLICAȚIA
+            </button>
+
+            <!-- Buton Renunță / Mergi la Meniu -->
+            <button id="btn-modal-cancel" style="background: none; border: none; color: var(--text-muted); font-size: 13px; text-decoration: underline; cursor: pointer; padding: 6px 12px; margin-top: 2px;">
+                Renunță și mergi la meniu
             </button>
 
             <!-- Ghid descărcare/instalare (apare la click pe Descarcă) -->
@@ -500,16 +513,24 @@
         </div>
     </div>
 
-    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=26) -->
+    <!-- Scripturi P2P WebRTC & Sunet & Joc (cu cache-busting v=27) -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="sound.js?v=26"></script>
-    <script src="game.js?v=26"></script>
+    <script src="sound.js?v=27"></script>
+    <script src="game.js?v=27"></script>
 
     <!-- Înregistrare Service Worker PWA cu Auto-Update forțat -->
     <script>
         if ('serviceWorker' in navigator) {
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
+
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=26')
+                navigator.serviceWorker.register('./sw.js?v=27')
                     .then(reg => {
                         console.log('ServiceWorker PWA activat:', reg.scope);
                         reg.update();
